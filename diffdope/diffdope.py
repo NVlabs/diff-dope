@@ -16,6 +16,21 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class Camera:
+    '''
+    A class for representing the camera, mostly to store classic computer vision oriented reprojection values 
+    and then get the OpenGL projection matrix out. 
+    
+    Args: 
+        fx (float): focal lenght x-axis in pixel unit
+        fy (float): focal lenght y-axis in pixel unit
+        cx (float): principal point x-axis in pixel
+        cy (float): principal point y-axis in pixel
+        im_width (int): width of the image
+        im_height (int): height of the image 
+        znear (float, optional): for the opengl reprojection, how close can a point be to the camera before it is clipped 
+        zfar (float, optional): for the opengl reprojection, how far can a point be to the camera before it is clipped
+    '''
+
     fx: float
     fy: float
     cx: float
@@ -26,12 +41,17 @@ class Camera:
     zfar: Optional[float] = 200
 
     def get_projection_matrix(self):
-        """Conversion of Hartley-Zisserman intrinsic matrix to OpenGL proj. matrix.
+        """
+        Conversion of Hartley-Zisserman intrinsic matrix to OpenGL proj. matrix.
 
-        Ref:
+        Refs:
+
         1) https://strawlab.org/2011/11/05/augmented-reality-with-OpenGL
         2) https://github.com/strawlab/opengl-hz/blob/master/src/calib_test_utils.py
         3) https://github.com/megapose6d/megapose6d/blob/3f5b51d9cef71d9ac0ac36c6414f35013bee2b0b/src/megapose/panda3d_renderer/types.py
+        
+        Returns: 
+            np.ndarray: a 4x4 projection matrix
         """
 
         K = np.array([
@@ -77,6 +97,27 @@ class Camera:
 
 @dataclass
 class Mesh:
+    '''
+    A wrapper around trimesh's mesh, where the data is already loaded 
+    to be consumed by pytorch. As such the internal values are stored as 
+    torch array. 
+
+    Args: 
+        path_model (str): path to the object to be loaded, see trimesh which extensions are supported. 
+    
+    Attributes:
+        pos_idx (torch.tensor): (nb_triangle,3) triangle list for the mesh
+        pos (torch.tensor): (n,3) vertex positions in object space
+        vtx_color (torch.tensor): (n,3) vertex color - might not exists if the file does not have that information stored
+        tex (torch.tensor): (w,h,3) textured saved - might not exists if the file does not have texture 
+        uv (torch.tensor): (n,2) vertex uv position - might not exists if the file does not have texture
+        uv_idx (torch.tensor): (nb_triangle,3) triangles for the uvs - might not exists if the file does not have texture
+        bounding_volume (np.array): (2,3) minimum x,y,z with maximum x,y,z
+        dimensions (list): size in all three axes
+        center_point (list): position of the center of the object     
+        textured_map (boolean): was there a texture loaded 
+    '''
+
     path_model: str
     
     def __post_init__(self):
@@ -92,6 +133,11 @@ class Mesh:
         normals = np.asarray(mesh.vertex_normals)
         
         pos_idx = torch.from_numpy(pos_idx.astype(np.int32))
+
+        #
+        # TODO THIS USED TO HAVE /100 on the vertex_pos move to a general scale function. 
+        #
+
         vtx_pos = torch.from_numpy(pos.astype(np.float32))
         vtx_normals = torch.from_numpy(normals.astype(np.float32))
         bounding_volume = [
@@ -151,8 +197,23 @@ class Mesh:
 
 @dataclass
 class Pose:
+    """
+    A translation and rotation representation for the object. 
+    The translation is stored as a numpy array, [x,y,z].
+    The rotation is stored as a quaternion using pyrr.
+
+    Args: 
+        position (list): a 3 value list of the object position
+        rotation (list): could be a quat with 4 values, or a flatten rotational matrix or a 3x3 matrix (as a list of list). 
+    """
     position: list
+    '''
+    the position field after init becomes a (np.ndarray)
+    '''
     rotation: list
+    '''
+    the rotation field after init becomes a (pyrr.Quaternion)
+    '''
 
     def __post_init__(self):
         assert len(self.position) == 3
@@ -171,6 +232,13 @@ class Pose:
 
 @dataclass
 class DiffDope:
+    '''
+    The main class containing all the information needed to run a Diff-DOPE optimization. 
+    This file is mostly driven by a config file using hydra, see the `configs/` folder. 
+    
+    Args:
+        cfg (DictConfig): a config file that populates the right information in the class. Please see `configs/diffdope.yaml` for more information.
+    '''
     cfg: Optional[DictConfig]=None 
     camera: Optional[Camera]=None
     pose: Optional[Pose]=None
@@ -187,9 +255,11 @@ class DiffDope:
             if self.mesh is None:
                 self.mesh = Mesh(self.cfg.scene_path.model_path)
 
-
-
-
+    def to_cuda(self):
+        '''
+        Set all the variables needed to be on gpu to the gpu.
+        '''
+        pass
 
 
 

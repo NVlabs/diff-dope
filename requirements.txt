@@ -1,0 +1,5 @@
+hydra-core
+torch 
+numpy
+pyrr 
+trimesh

@@ -51,7 +51,7 @@ class Camera:
         3) https://github.com/megapose6d/megapose6d/blob/3f5b51d9cef71d9ac0ac36c6414f35013bee2b0b/src/megapose/panda3d_renderer/types.py
         
         Returns: 
-            np.ndarray: a 4x4 projection matrix
+            torch.tensor: a 4x4 projection matrix in OpenGL coordinate frame
         """
 
         K = np.array([
@@ -93,7 +93,7 @@ class Camera:
             [0, 0, -1, 0]
             ])
         
-        return proj
+        return torch.tensor(proj)
 
 @dataclass
 class Mesh:
@@ -196,37 +196,156 @@ class Mesh:
 
 
 @dataclass
-class Pose:
-    """
-    A translation and rotation representation for the object. 
-    The translation is stored as a numpy array, [x,y,z].
-    The rotation is stored as a quaternion using pyrr.
+# class Pose:
+#     """
+#     A translation and rotation representation for the object. 
+#     The translation is stored as a numpy array, [x,y,z].
+#     The rotation is stored as a quaternion using pyrr.
 
-    Args: 
-        position (list): a 3 value list of the object position
-        rotation (list): could be a quat with 4 values, or a flatten rotational matrix or a 3x3 matrix (as a list of list). 
-    """
-    position: list
-    '''
-    the position field after init becomes a (np.ndarray)
-    '''
-    rotation: list
-    '''
-    the rotation field after init becomes a (pyrr.Quaternion)
-    '''
+#     Args: 
+#         position (list): a 3 value list of the object position
+#         rotation (list): could be a quat with 4 values (x,y,z,w), or a flatten rotational matrix or a 3x3 matrix (as a list of list) -- both are row-wise / row-major. 
+#     """
+#     position: list
+#     '''
+#     the position field after init becomes a (torch.tensor)
+#     '''
+#     rotation: list
+#     '''
+#     the rotation field after init becomes a (torch.tensor)
+#     '''
 
-    def __post_init__(self):
-        assert len(self.position) == 3
-        self.position = np.array(self.position)
+#     def __post_init__(self):
 
-        assert len(self.rotation) == 4 or len(self.rotation) == 3 or len(self.rotation) == 9 
-        if len(self.rotation) == 4:
-            self.rotation = pyrr.Quaternion(self.rotation)   
-        if len(self.rotation) == 3 or len(self.rotation) == 9:
-            self.rotation = pyrr.Matrix33(self.rotation)   
+#         ### TODO check if list to execute this ###
+
+#         assert len(self.position) == 3
+#         self.position = np.array(self.position)
+
+#         assert len(self.rotation) == 4 or len(self.rotation) == 3 or len(self.rotation) == 9 
+#         if len(self.rotation) == 4:
+#             self.rotation = pyrr.Quaternion(self.rotation)   
+#         if len(self.rotation) == 3 or len(self.rotation) == 9:
+#             self.rotation = pyrr.Matrix33(self.rotation)   
         
-        log.info(f'translation loaded: {self.position}')
-        log.info(f'rotation loaded as quaternion: {self.rotation}')
+#         self.position = torch.tensor(self.position)
+#         self.rotation = torch.tensor(self.rotation)
+
+#         log.info(f'translation loaded: {self.position}')
+#         log.info(f'rotation loaded as quaternion: {self.rotation}')
+
+
+
+
+
+#### TODO change above to this here: 
+class Pose(torch.nn.Module):
+    '''
+    This is a batch pose representation that Diff-DOPE uses to optimize. 
+
+    Attributes: 
+        qx,qy,qz,qw (torch.nn.Parameter): Batchsize x 1 representing the quaternion
+        x,y,z (torch.nn.Parameter): Batchsize x 1 representing the position
+    '''
+    def __init__(self, position:list, rotation:list, batchsize:int=32):
+        '''
+        Args: 
+            position (list): a 3 value list of the object position
+            rotation (list): could be a quat with 4 values (x,y,z,w), or a flatten rotational matrix or a 3x3 matrix (as a list of list) -- both are row-wise / row-major. 
+            batchsize (int): size of the batch to be optimized, this is defined normally as a hyperparam.
+        '''
+        super().__init__()
+        self.qx = None # to load on cpu and not gpu
+
+        self.set_pose(position,rotation,batchsize)
+
+    def set_pose(self,position:list,rotation:list,batchsize:int=32):
+        '''
+        Set the pose to new values, the inputs can be either list, numpy or torch.tensor. If the class was put on cuda(), the udpdated pose should be on the gpu as well. 
+
+        Args: 
+            position (list): a 3 value list of the object position
+            rotation (list): could be a quat with 4 values (x,y,z,w), or a flatten rotational matrix or a 3x3 matrix (as a list of list) -- both are row-wise / row-major. 
+            batchsize (int): size of the batch to be optimized, this is defined normally as a hyperparam.
+        '''
+
+        assert len(position) == 3
+        position = np.array(position)
+
+        assert len(rotation) == 4 or len(rotation) == 3 or len(rotation) == 9 
+        if len(rotation) == 4:
+            rotation = pyrr.Quaternion(rotation)   
+        if len(rotation) == 3 or len(rotation) == 9:
+            rotation = pyrr.Matrix33(rotation).quaternion  
+        
+        log.info(f'translation loaded: {position}')
+        log.info(f'rotation loaded as quaternion: {rotation}')
+        self._position = position
+        self._rotation = rotation
+
+        
+        if self.qx is None:
+            device = 'cpu'
+        else:
+            device = self.qx.device
+        self.qx = torch.nn.Parameter(torch.ones(batchsize)*rotation[0]).to(device)
+        self.qy = torch.nn.Parameter(torch.ones(batchsize)*rotation[1]).to(device)
+        self.qz = torch.nn.Parameter(torch.ones(batchsize)*rotation[2]).to(device)
+        self.qw = torch.nn.Parameter(torch.ones(batchsize)*rotation[3]).to(device)
+
+        self.x = torch.nn.Parameter(torch.ones(batchsize)*position[0]).to(device)
+        self.y = torch.nn.Parameter(torch.ones(batchsize)*position[1]).to(device)
+        self.z = torch.nn.Parameter(torch.ones(batchsize)*position[2]).to(device)
+
+    def set_batchsize(self,batchsize:int):
+        '''
+        Change the batchsize to a new value, use the latest position and rotation to reset the batch of poses with. Be careful to make sure the image data is also updated accordingly.
+
+        Args:
+            batchsize (int): Batchsize to optimize 
+        '''
+        device = self.qx.device
+
+        self.qx = torch.nn.Parameter(torch.ones(batchsize)*self._rotation[0]).to(device)
+        self.qy = torch.nn.Parameter(torch.ones(batchsize)*self._rotation[1]).to(device)
+        self.qz = torch.nn.Parameter(torch.ones(batchsize)*self._rotation[2]).to(device)
+        self.qw = torch.nn.Parameter(torch.ones(batchsize)*self._rotation[3]).to(device)
+
+        self.x = torch.nn.Parameter(torch.ones(batchsize)*self._position[0]).to(device)
+        self.y = torch.nn.Parameter(torch.ones(batchsize)*self._position[1]).to(device)
+        self.z = torch.nn.Parameter(torch.ones(batchsize)*self._position[2]).to(device)        
+        pass
+
+    def reset_pose(self):
+        '''
+        Reset the pose to what was passed during init. This could be called if an optimization was ran multiple times. 
+        '''
+        device = self.qx.device
+
+        self.qx = torch.nn.Parameter(torch.ones(self.qx.shape[0])*self._rotation[0]).to(device)
+        self.qy = torch.nn.Parameter(torch.ones(self.qx.shape[0])*self._rotation[1]).to(device)
+        self.qz = torch.nn.Parameter(torch.ones(self.qx.shape[0])*self._rotation[2]).to(device)
+        self.qw = torch.nn.Parameter(torch.ones(self.qx.shape[0])*self._rotation[3]).to(device)
+
+        self.x = torch.nn.Parameter(torch.ones(self.qx.shape[0])*self._position[0]).to(device)
+        self.y = torch.nn.Parameter(torch.ones(self.qx.shape[0])*self._position[1]).to(device)
+        self.z = torch.nn.Parameter(torch.ones(self.qx.shape[0])*self._position[2]).to(device)        
+
+        pass
+
+    def forward(self):
+        '''
+        Return: 
+            returns a dict with field quat, trans. 
+        '''
+
+        q = torch.stack([self.qx,self.qy,self.qz,self.qw],dim=0).T
+        q = q / torch.norm(q,dim=1).reshape(-1,1)
+
+        return {
+            "quat": q,
+            'trans': torch.stack([self.x,self.y,self.z,],dim=0).T,
+        }
 
 
 
@@ -260,6 +379,7 @@ class DiffDope:
         Set all the variables needed to be on gpu to the gpu.
         '''
         pass
+
 
 
 

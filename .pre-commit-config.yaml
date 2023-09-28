@@ -29,11 +29,11 @@ repos:
       hooks:
           - id: python-no-eval
 
-    # See configuration options for yamlfmt here:
-    # https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
     - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
       rev: 0.2.3
       hooks:
+          # See configuration options for yamlfmt here:
+          # https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
           - id: yamlfmt
 
     - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
@@ -42,8 +42,16 @@ repos:
           - id: python-safety-dependencies-check
             args: [--groups=dev]
 
+    - repo: https://github.com/codespell-project/codespell
+      rev: v2.2.4
+      hooks:
+          # From https://github.com/codespell-project/codespell:
+          # > It does not check for word membership in a complete dictionary,
+          # > but instead looks for a set of common misspellings.
+          - id: codespell
+
     - repo: https://github.com/crate-ci/typos
       rev: v1.16.15
       hooks:
           - id: typos
-            args: []
+            args: []  # will report typos without attempting to fix them

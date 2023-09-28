@@ -385,14 +385,7 @@ class Pose(torch.nn.Module):
 
         return {
             "quat": q,
-            "trans": torch.stack(
-                [
-                    self.x,
-                    self.y,
-                    self.z,
-                ],
-                dim=0,
-            ).T,
+            "trans": torch.stack([self.x, self.y, self.z], dim=0).T,
         }
 
 
@@ -424,6 +417,6 @@ class DiffDope:
 
     def to_cuda(self):
         """
-        Copy the necessary to the GPU.
+        Copy variables to the GPU.
         """
         pass

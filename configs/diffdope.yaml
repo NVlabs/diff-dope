@@ -9,7 +9,7 @@ scene_path:
   model_path: 'data/example/mesh/AlphabetSoup.obj'
   img: ''
   depth: ''
-  segmentation: '' 
+  segmentation: ''
 pose:
   position: [0,0,0]
   # rotation can be a quaternion, matrix 3x3 flatten or not

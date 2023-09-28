@@ -24,8 +24,6 @@ setup(
             "black",
             "ipython",
             "pre-commit",
-            "pylint",
-            "pytest",
         ],
     },
 )

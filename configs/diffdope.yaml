@@ -1,16 +1,17 @@
+---
 camera:
-  fx: 125
-  fy: 130
-  cx: 200
-  cy: 200
-  im_width: 400
-  im_height: 400
+    fx: 125
+    fy: 130
+    cx: 200
+    cy: 200
+    im_width: 400
+    im_height: 400
 scene_path:
-  model_path: 'data/example/mesh/AlphabetSoup.obj'
-  img: ''
-  depth: ''
-  segmentation: ''
+    model_path: data/example/mesh/AlphabetSoup.obj
+    img: ''
+    depth: ''
+    segmentation: ''
 pose:
-  position: [0,0,0]
+    position: [0, 0, 0]
   # rotation can be a quaternion, matrix 3x3 flatten or not
-  rotation: [0,0,0,1]
+    rotation: [0, 0, 0, 1]

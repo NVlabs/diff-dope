@@ -1,25 +1,49 @@
+---
 repos:
-  - repo: https://github.com/psf/black-pre-commit-mirror
-    rev: 23.9.1
-    hooks:
-      - id: black
-        name: black (python)
+    - repo: https://github.com/psf/black-pre-commit-mirror
+      rev: 23.9.1
+      hooks:
+          - id: black
+            name: black (python)
 
-  - repo: https://github.com/pycqa/isort
-    rev: 5.12.0
-    hooks:
-      - id: isort
-        args: ["--profile", "black", "--filter-files"]
+    - repo: https://github.com/pycqa/isort
+      rev: 5.12.0
+      hooks:
+          - id: isort
+            args: [--profile, black, --filter-files]
 
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
-    hooks:
-      - id: check-json
-      - id: check-toml
-      - id: check-yaml
-      - id: end-of-file-fixer
-      - id: pretty-format-json
-        args: [--autofix, --indent=2]
-      - id: requirements-txt-fixer
-      - id: trailing-whitespace
-        args: [--markdown-linebreak-ext=md]
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v4.4.0
+      hooks:
+          - id: check-json
+          - id: check-yaml
+          - id: end-of-file-fixer
+          - id: pretty-format-json
+            args: [--autofix, --indent=2]
+          - id: requirements-txt-fixer
+          - id: trailing-whitespace
+            args: [--markdown-linebreak-ext=md]
+
+    - repo: https://github.com/pre-commit/pygrep-hooks
+      rev: v1.10.0
+      hooks:
+          - id: python-no-eval
+
+    # See configuration options for yamlfmt here:
+    # https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
+    - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
+      rev: 0.2.3
+      hooks:
+          - id: yamlfmt
+
+    - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
+      rev: v1.3.2
+      hooks:
+          - id: python-safety-dependencies-check
+            args: [--groups=dev]
+
+    - repo: https://github.com/crate-ci/typos
+      rev: v1.16.15
+      hooks:
+          - id: typos
+            args: []

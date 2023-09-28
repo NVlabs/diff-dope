@@ -1,5 +1,6 @@
 hydra-core
-torch 
 numpy
+omegaconf
 pyrr 
+torch 
 trimesh

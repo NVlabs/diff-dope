@@ -20,8 +20,8 @@ class Camera:
     and then get the OpenGL projection matrix out.
 
     Args:
-        fx (float): focal lenght x-axis in pixel unit
-        fy (float): focal lenght y-axis in pixel unit
+        fx (float): focal length x-axis in pixel unit
+        fy (float): focal length y-axis in pixel unit
         cx (float): principal point x-axis in pixel
         cy (float): principal point y-axis in pixel
         im_width (int): width of the image
@@ -41,7 +41,7 @@ class Camera:
 
     def get_projection_matrix(self):
         """
-        Conversion of Hartley-Zisserman intrinsic matrix to OpenGL proj. matrix.
+        Conversion of Hartley-Zisserman intrinsic matrix to OpenGL projection matrix.
 
         Refs:
 
@@ -108,12 +108,12 @@ class Camera:
 @dataclass
 class Mesh:
     """
-    A wrapper around trimesh's mesh, where the data is already loaded
-    to be consumed by pytorch. As such the internal values are stored as
+    A wrapper around a Trimesh mesh, where the data is already loaded
+    to be consumed by PyTorch. As such the internal values are stored as
     torch array.
 
     Args:
-        path_model (str): path to the object to be loaded, see trimesh which extensions are supported.
+        path_model (str): path to the object to be loaded, see Trimesh which extensions are supported.
 
     Attributes:
         pos_idx (torch.tensor): (nb_triangle,3) triangle list for the mesh
@@ -254,11 +254,11 @@ class Mesh:
 #### TODO change above to this here:
 class Pose(torch.nn.Module):
     """
-    This is a batch pose representation that Diff-DOPE uses to optimize.
+    This is the batch pose representation that Diff-DOPE uses to optimize.
 
     Attributes:
-        qx,qy,qz,qw (torch.nn.Parameter): Batchsize x 1 representing the quaternion
-        x,y,z (torch.nn.Parameter): Batchsize x 1 representing the position
+        qx,qy,qz,qw (torch.nn.Parameter): batchsize x 1 representing the quaternion
+        x,y,z (torch.nn.Parameter): batchsize x 1 representing the position
     """
 
     def __init__(self, position: list, rotation: list, batchsize: int = 32):
@@ -266,7 +266,7 @@ class Pose(torch.nn.Module):
         Args:
             position (list): a 3 value list of the object position
             rotation (list): could be a quat with 4 values (x,y,z,w), or a flatten rotational matrix or a 3x3 matrix (as a list of list) -- both are row-wise / row-major.
-            batchsize (int): size of the batch to be optimized, this is defined normally as a hyperparam.
+            batchsize (int): size of the batch to be optimized, this is defined normally as a hyperparameter.
         """
         super().__init__()
         self.qx = None  # to load on cpu and not gpu
@@ -275,12 +275,12 @@ class Pose(torch.nn.Module):
 
     def set_pose(self, position: list, rotation: list, batchsize: int = 32):
         """
-        Set the pose to new values, the inputs can be either list, numpy or torch.tensor. If the class was put on cuda(), the udpdated pose should be on the gpu as well.
+        Set the pose to new values, the inputs can be either list, numpy or torch.tensor. If the class was put on cuda(), the updated pose should be on the GPU as well.
 
         Args:
             position (list): a 3 value list of the object position
             rotation (list): could be a quat with 4 values (x,y,z,w), or a flatten rotational matrix or a 3x3 matrix (as a list of list) -- both are row-wise / row-major.
-            batchsize (int): size of the batch to be optimized, this is defined normally as a hyperparam.
+            batchsize (int): size of the batch to be optimized, this is defined normally as a hyperparameter.
         """
 
         assert len(position) == 3
@@ -424,6 +424,6 @@ class DiffDope:
 
     def to_cuda(self):
         """
-        Set all the variables needed to be on gpu to the gpu.
+        Copy the necessary to the GPU.
         """
         pass

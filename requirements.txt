@@ -1,6 +1,7 @@
 hydra-core
 numpy
 omegaconf
-pyrr 
-torch 
+pyrr
+nvdiffrast@git+https://github.com/NVlabs/nvdiffrast.git
+torch
 trimesh

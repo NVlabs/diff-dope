@@ -17,12 +17,12 @@ repos:
       hooks:
           - id: check-json
           - id: check-yaml
-          # - id: end-of-file-fixer
+          - id: end-of-file-fixer
           - id: pretty-format-json
             args: [--autofix, --indent=2]
           - id: requirements-txt-fixer
-          # - id: trailing-whitespace
-          #   args: [--markdown-linebreak-ext=md]
+          - id: trailing-whitespace
+            args: [--markdown-linebreak-ext=md]
 
     - repo: https://github.com/pre-commit/pygrep-hooks
       rev: v1.10.0

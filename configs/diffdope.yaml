@@ -8,12 +8,19 @@ camera:
     im_height: 400
 scene_path:
     model_path: data/example/mesh/AlphabetSoup.obj
-    img: ''
+    img: data/example/scene/rgb.png
     depth: ''
-    segmentation: ''
+    segmentation: data/example/scene/seg.png
 pose:
     position: [0, 0, 0]
   # rotation can be a quaternion, matrix 3x3 flatten or not
     rotation: [0, 0, 0, 1]
 hyperparameters:
+    nb_iterations: 50
     batchsize: 16
+    learning_rates_bound: [0.01, 100]
+    learning_rate_base: 20
+    lr_decay: 0.01
+    weight_rgb: 1
+    weight_depth: 0.8
+    weight_seg: 0.5

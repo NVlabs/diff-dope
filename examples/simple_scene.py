@@ -12,7 +12,11 @@ def main(cfg: DictConfig):
     ddope.pose.set_batchsize(16)
 
     img_dd = dd.Image(img_path="data/example/scene/rgb.png", img_resize=0.5)
-    print(img_dd)
+    # print(img_dd.img_tensor.shape)
+
+    img_dd = dd.Image(img_path="data/example/scene/seg.png", img_resize=0.5)
+    # print(img_dd.img_tensor.shape)
+
     # run the network
     p = ddope.pose()
 

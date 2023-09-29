@@ -491,6 +491,7 @@ class Image:
                         ),
                     )
             self.img_tensor = torch.tensor(im).float() / 255.0
+            log.info(f"Loaded image {self.img_path}, shape: {self.img_tensor.shape}")
 
     def cuda(self):
         """
@@ -514,6 +515,14 @@ class DiffDope:
     pose: Optional[Pose] = None
     mesh: Optional[Mesh] = None
 
+    # TODO:
+    # resize function for the image?
+    # storing the images
+    # storing the renders for the optimization
+    # how to pass add_loss
+    # how to store losses
+    # driven by the cfg
+
     def __post_init__(self):
         if not self.cfg is None:
             if self.camera is None:
@@ -529,4 +538,6 @@ class DiffDope:
         """
         Copy variables to the GPU.
         """
+        # check the projection matrix
+        #
         pass

@@ -2,6 +2,7 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
+import cv2
 import hydra
 import numpy as np
 import pyrr
@@ -24,6 +25,57 @@ def dist_batch_lr(tensor, learning_rates, channels=[1, 2, 3]):
     """
 
     return torch.mean((torch.mean(tensor, channels) * learning_rates))
+
+
+def opencv_2_opengl(p, q):
+    """
+    Converting the pose from opencv coordinate to opengl coordinate
+
+    Args:
+        p (np.ndarray): position
+        q (pyrr.Quaternion): quat
+
+    Returns:
+        p,q
+    """
+    source_transform = q.matrix44
+    source_transform[:3, 3] = p
+    opengl_to_opencv = np.array(
+        [[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]]
+    )
+
+    R_opengl_to_opencv = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]])
+
+    t_opengl_to_opencv = np.array([0, 0, 0])
+
+    # Adjust rotation and translation for target coordinate system
+    adjusted_rotation = np.dot(R_opengl_to_opencv, source_transform[:3, :3])
+    adjusted_translation = (
+        np.dot(R_opengl_to_opencv, source_transform[:3, 3]) + t_opengl_to_opencv
+    )
+
+    # Build target transformation matrix (OpenCV convention)
+    target_transform = np.eye(4)
+    target_transform[:3, :3] = adjusted_rotation
+    target_transform[:3, 3] = adjusted_translation
+
+    q = pyrr.Matrix44(target_transform).quaternion
+
+    # TODO verify what is going on here, this should not be needed ...
+    # legacy code here
+    q = (
+        q
+        * pyrr.Quaternion.from_z_rotation(np.pi / 2)
+        * pyrr.Quaternion.from_y_rotation(-np.pi / 2)
+    )
+    q = (
+        q
+        * pyrr.Quaternion.from_z_rotation(-np.pi / 2)
+        * pyrr.Quaternion.from_x_rotation(-np.pi / 2)
+    )
+    # END TODO
+
+    return target_transform[:3, 3], q
 
 
 @dataclass
@@ -51,6 +103,20 @@ class Camera:
     im_height: int
     znear: Optional[float] = 0.01
     zfar: Optional[float] = 200
+
+    def resize(self, percentage):
+        """
+        If you resize the images for the optimization
+
+        Args:
+            percentage (float): bounded between [0,1]
+        """
+        self.fx *= percentage
+        self.fy *= percentage
+        self.cx = (int)(percentage * self.cx)
+        self.cy = (int)(percentage * self.cy)
+        self.im_width = (int)(percentage * self.im_width)
+        self.im_height = (int)(percentage * self.im_height)
 
     def get_projection_matrix(self):
         """
@@ -224,47 +290,6 @@ class Mesh:
         )
 
 
-# @dataclass
-# class Pose:
-#     """
-#     A translation and rotation representation for the object.
-#     The translation is stored as a numpy array, [x,y,z].
-#     The rotation is stored as a quaternion using pyrr.
-
-#     Args:
-#         position (list): a 3 value list of the object position
-#         rotation (list): could be a quat with 4 values (x,y,z,w), or a flatten rotational matrix or a 3x3 matrix (as a list of list) -- both are row-wise / row-major.
-#     """
-#     position: list
-#     '''
-#     the position field after init becomes a (torch.tensor)
-#     '''
-#     rotation: list
-#     '''
-#     the rotation field after init becomes a (torch.tensor)
-#     '''
-
-#     def __post_init__(self):
-
-#         ### TODO check if list to execute this ###
-
-#         assert len(self.position) == 3
-#         self.position = np.array(self.position)
-
-#         assert len(self.rotation) == 4 or len(self.rotation) == 3 or len(self.rotation) == 9
-#         if len(self.rotation) == 4:
-#             self.rotation = pyrr.Quaternion(self.rotation)
-#         if len(self.rotation) == 3 or len(self.rotation) == 9:
-#             self.rotation = pyrr.Matrix33(self.rotation)
-
-#         self.position = torch.tensor(self.position)
-#         self.rotation = torch.tensor(self.rotation)
-
-#         log.info(f'translation loaded: {self.position}')
-#         log.info(f'rotation loaded as quaternion: {self.rotation}')
-
-
-#### TODO change above to this here:
 class Pose(torch.nn.Module):
     """
     This is the batch pose representation that Diff-DOPE uses to optimize.
@@ -274,19 +299,32 @@ class Pose(torch.nn.Module):
         x,y,z (torch.nn.Parameter): batchsize x 1 representing the position
     """
 
-    def __init__(self, position: list, rotation: list, batchsize: int = 32):
+    def __init__(
+        self,
+        position: list,
+        rotation: list,
+        batchsize: int = 32,
+        opencv2opengl: bool = True,
+    ):
         """
         Args:
             position (list): a 3 value list of the object position
             rotation (list): could be a quat with 4 values (x,y,z,w), or a flatten rotational matrix or a 3x3 matrix (as a list of list) -- both are row-wise / row-major.
             batchsize (int): size of the batch to be optimized, this is defined normally as a hyperparameter.
+            opencv2opengl (bool): converting the coordinate space from one to the other
         """
         super().__init__()
         self.qx = None  # to load on cpu and not gpu
 
-        self.set_pose(position, rotation, batchsize)
+        self.set_pose(position, rotation, batchsize, opencv2opengl=opencv2opengl)
 
-    def set_pose(self, position: list, rotation: list, batchsize: int = 32):
+    def set_pose(
+        self,
+        position: list,
+        rotation: list,
+        batchsize: int = 32,
+        opencv2opengl: bool = True,
+    ):
         """
         Set the pose to new values, the inputs can be either list, numpy or torch.tensor. If the class was put on cuda(), the updated pose should be on the GPU as well.
 
@@ -305,8 +343,12 @@ class Pose(torch.nn.Module):
         if len(rotation) == 3 or len(rotation) == 9:
             rotation = pyrr.Matrix33(rotation).quaternion
 
+        if opencv2opengl:
+            position, rotation = opencv_2_opengl(position, rotation)
+
         log.info(f"translation loaded: {position}")
         log.info(f"rotation loaded as quaternion: {rotation}")
+
         self._position = position
         self._rotation = rotation
 
@@ -403,6 +445,61 @@ class Pose(torch.nn.Module):
 
 
 @dataclass
+class Image:
+    """
+    A class to represent a image, this could be a depth image or a rgb image, etc.
+
+    *The image has to be upside down to work in DIFF-DOPE*
+
+    Args:
+        img_path (str): a path to an image to load
+        img_resize (float): bounded [0,1] to resize the image
+        flip_img (bool): Default is True, when initialized to the image need to be flipped (diff-dope works with flipped images)
+        img_tensor (torch.tensor): an image in tensor format, assumes the image is bounded [0,1]
+    """
+
+    img_path: Optional[str] = None
+    img_tensor: Optional[torch.tensor] = None
+    img_resize: Optional[float] = 1
+    flip_img: Optional[bool] = True
+    depth: Optional[bool] = False
+    depth_scale: Optional[float] = 100
+
+    def __post_init__(self):
+        if not self.img_path is None:
+            if self.depth:
+                im = cv2.imread(self.img_path, cv2.IMREAD_UNCHANGED) / self.depth_scale
+            else:
+                im = cv2.imread(self.img_path)[:, :, :3]
+                im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+            if self.img_resize < 1.0:
+                if self.depth:
+                    im = cv2.resize(
+                        im,
+                        (
+                            int(im.shape[1] * self.img_resize),
+                            int(im.shape[0] * self.img_resize),
+                        ),
+                        interpolation=cv2.INTER_NEAREST,
+                    )
+                else:
+                    im = cv2.resize(
+                        im,
+                        (
+                            int(im.shape[1] * self.img_resize),
+                            int(im.shape[0] * self.img_resize),
+                        ),
+                    )
+            self.img_tensor = torch.tensor(im).float() / 255.0
+
+    def cuda(self):
+        """
+        Switch the img_tensor to cuda tensor
+        """
+        self.img_tensor = self.img_tensor.cuda()
+
+
+@dataclass
 class DiffDope:
     """
     The main class containing all the information needed to run a Diff-DOPE optimization.
@@ -428,7 +525,7 @@ class DiffDope:
             if self.mesh is None:
                 self.mesh = Mesh(self.cfg.scene_path.model_path)
 
-    def to_cuda(self):
+    def cuda(self):
         """
         Copy variables to the GPU.
         """

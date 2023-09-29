@@ -60,6 +60,14 @@ def main(cfg: DictConfig):
     d_dope.pose = Pose(pose_from_pnp["position"], pose_from_pnp["rotation"])
     pose = d_dope.optimize()
 
+    ### adding losses ###
+    def my_loss(data, cfg):
+        diff_image = data["render"]["rgb"] - data["observation"]["rgb"]
+
+        return loss_to_be_added
+
+    d_dope.add_loss(my_loss)
+
 
 if __name__ == "__main__":
     main()

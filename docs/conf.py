@@ -24,9 +24,6 @@ extensions = [
     "sphinx.ext.napoleon",
 ]
 
-autodoc_sources = [
-    "/Users/jtremblay/code/diff-dope/diffdope/",
-]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]

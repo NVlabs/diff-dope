@@ -13,6 +13,19 @@ from omegaconf import DictConfig, OmegaConf
 log = logging.getLogger(__name__)
 
 
+def dist_batch_lr(tensor, learning_rates, channels=[1, 2, 3]):
+    """
+    Method that distribute different learning rates to the batch.
+
+    Args:
+        tensor (torch.tensor): BxWxHxC if you do not have C, pass a different set of channel, for example you could run on a depth map [1,2].
+        learning_rates (torch.tensor): B the different learning rates needed.
+        channels (list): the index values used to apply the first mean, e.g., [1,2,3] for colored image, or [1,2] for a depth map
+    """
+
+    return torch.mean((torch.mean(tensor, channels) * learning_rates))
+
+
 @dataclass
 class Camera:
     """
@@ -211,7 +224,7 @@ class Mesh:
         )
 
 
-@dataclass
+# @dataclass
 # class Pose:
 #     """
 #     A translation and rotation representation for the object.

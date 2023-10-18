@@ -3,3 +3,6 @@
 *DS_Store
 outputs/
 docs/_buid/
+*.png
+*.jpg
+*.jpeg

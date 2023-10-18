@@ -375,10 +375,25 @@ def make_grid_overlay_batch(
         color_countour = [1,0,0],
         flip_result = True
     ):
+    '''
+    Make a grid image of a batch
+
+    Args: 
+        foreground (torch.tensor): BxWxHx3 normalized foreground image 
+        background (torch.tensor): BxWxHx3 normalized background image, if None dont add 
+        alpha (float): alpha of the nvdiffrast render,
+        row (int): how entry in a row you want for the grid
+        final_width (int): final width in pixel of the grid image
+        add_background (bool): Add the background or not ,
+        add_countour (bool): Add the foreground countour or not,
+        color_countour (list(float)): color in normalized space
+        flip_result (bool): Flip the final image
+    
+    Returns: 
+        A grid cv2 image (nd.array): WxHx3
+    '''
 
     # assumes a 3 channel image and normalized
-    print(foreground.shape)
-    print(background.shape)
     foreground = make_grid_image(foreground,row,final_width)
 
     if add_countour:
@@ -412,6 +427,7 @@ def make_grid_overlay_batch(
         blended_image = cv2.flip(blended_image,0)
 
     return blended_image
+
 
 
 @dataclass
@@ -1156,7 +1172,20 @@ class DiffDope:
 
             return img
         else:
-            # make an image 
+            # todo john
+            img = make_grid_overlay_batch(
+                background = self.gt_tensors[render_selection][i_guess].unsqueeze(0), 
+                foreground = self.optimization_results[index][render_selection][i_guess].unsqueeze(0),  
+                alpha=self.cfg.render_images.alpha_overlay,
+                row =self.cfg.render_images.nrow,
+                final_width=self.cfg.render_images.final_width_batch,
+                add_background = self.cfg.render_images.add_background,
+                add_countour = self.cfg.render_images.add_countour,
+                color_countour = self.cfg.render_images.color_countour,
+                flip_result = self.cfg.render_images.flip_result
+            )
+
+            return img
             pass
 
         return None

@@ -197,6 +197,40 @@ def render_texture_batch(glctx, proj_cam, mtx, pos, pos_idx, resolution,
 # IMG MANIPULATION
 ##############################################################################
 
+@torch.no_grad()
+def find_crop(img_tensor, percentage=0.3):
+    '''
+    Find the bounding crop in an image, assuming it finds where there is non-zero.
+    
+    Args:
+        img_tensor: Input image tensor
+
+    Returns:
+        list: [top_row, left_col, size]
+    '''
+
+    img_tensor = (img_tensor > 0).float()
+
+    # Find the bounding box of the img_tensor
+    rows, cols = torch.nonzero(img_tensor[..., 0], as_tuple=True)
+    top_row, left_col = rows.min(), cols.min()
+    bottom_row, right_col = rows.max(), cols.max()
+    
+    # Calculate the wiggle room for each dimension (percentage of the width/height)
+    wiggle_room_rows = int((bottom_row - top_row + 1) * percentage)
+    wiggle_room_cols = int((right_col - left_col + 1) * percentage)
+
+    # Expand the bounding box by the wiggle room
+    top_row = max(0, top_row - wiggle_room_rows)
+    left_col = max(0, left_col - wiggle_room_cols)
+    bottom_row = min(img_tensor.shape[0] - 1, bottom_row + wiggle_room_rows)
+    right_col = min(img_tensor.shape[1] - 1, right_col + wiggle_room_cols)
+
+    # Calculate the size of the square crop as the minimum of the expanded height and width
+    crop_size = min(bottom_row - top_row, right_col - left_col)
+
+    return [top_row, left_col, crop_size]
+
 def getimg_stack(color_imgs,depth=False,depth_max = 3, w=1,h=1):
 
     if depth:
@@ -230,6 +264,7 @@ def getimg_stack(color_imgs,depth=False,depth_max = 3, w=1,h=1):
     # return cv2.resize(gt_final,(400,400))
     return gt_final
 
+@torch.no_grad()
 def im_resize(image,width=None,height=None):
     dim = None
     (h, w) = image.shape[:2]
@@ -354,6 +389,7 @@ def make_grid(
             k = k + 1
     return grid
 
+@torch.no_grad()
 def make_grid_image(img_batch,row,final_width,depth=False):
     img_batch = make_grid(img_batch.permute(0,3,1,2),nrow=row)
     img_batch = img_batch.mul(255).clamp_(0, 255).permute(1, 2, 0).to("cpu", torch.uint8).numpy()
@@ -364,6 +400,7 @@ def make_grid_image(img_batch,row,final_width,depth=False):
 
     return img_batch
 
+@torch.no_grad()
 def make_grid_overlay_batch(
         foreground,  
         background = None, 
@@ -675,7 +712,10 @@ class Mesh(torch.nn.Module):
 
         """
 
+        # TODO tex does not seem to be correct in its shape
+
         for key, value in vars(self).items():
+            print(key)
             if not key in self.to_process:
                 continue
             if self._batchsize_set is False:
@@ -683,7 +723,15 @@ class Mesh(torch.nn.Module):
             else:
                 vars(self)[key] = torch.stack([vars(self)[key][0]] * batchsize, dim=0)
 
-            vars(self)[key] = torch.nn.Parameter(vars(self)[key], requires_grad = False).to(vars(self)[key].device)
+        for key, value in self._parameters.items():
+            
+            if not key in self.to_process:
+                continue
+            if self._batchsize_set is False:
+                self._parameters[key] = torch.stack([self._parameters[key]] * batchsize, dim=0)
+            else:
+                self._parameters[key] = torch.stack([self._parameters[key][0]] * batchsize, dim=0)
+                
         if self._batchsize_set is False:
             self._batchsize_set = True
 
@@ -1100,6 +1148,8 @@ class DiffDope:
 
         self.set_batchsize(self.cfg.hyperparameters.batchsize)
 
+
+
         # logging
         log.info(f'batchsize is {self.cfg.hyperparameters.batchsize}')
         log.info(self.object3d)
@@ -1117,6 +1167,9 @@ class DiffDope:
         self.object3d.set_batchsize(batchsize)
         self.camera.set_batchsize(batchsize)
 
+        # todo add a cfg call here. 
+        # self.object3d.mesh.enable_gradients_texture()
+
         if self.scene.tensor_rgb is not None:
             self.gt_tensors['rgb'] = self.scene.tensor_rgb.img_tensor
         if self.scene.tensor_depth is not None:
@@ -1124,9 +1177,20 @@ class DiffDope:
         if self.scene.tensor_segmentation is not None:
             self.gt_tensors['segmentation'] = self.scene.tensor_segmentation.img_tensor
 
+        for name, param in self.object3d.named_parameters():
+            print(f"Parameter name: {name}")
+            print(f"Parameter shape: {param.shape}")
+            # print(f"Parameter values: {param}")
 
+        self.optimizer = torch.optim.SGD(
+            self.object3d.parameters(), 
+            lr=1
+        )
 
-    def render_img(self,index=None, batch_index=None, render_selection='rgb'):
+    def render_img(self,index=None, 
+            batch_index=None, 
+            render_selection='rgb',
+            ):
         '''
         Rendering an image with the render overlay on the image or not. 
             Check config `render_images` entry for hyper params for this function. 
@@ -1138,7 +1202,7 @@ class DiffDope:
                 background? 
             alpha_overlay (float): The transparency applied to the rendered 3d model
                 so you can see how it overlays
-
+            crop_around_mask (bool): Crop around the provided mask, if no mask then uses the render to crop, but crop will be moving
 
         Args: 
             index (int): None, which index of the optimization you want to render
@@ -1150,17 +1214,33 @@ class DiffDope:
         Returns: 
             An image in the form of a nd.array (cv2 style)
         '''
+
+        # TODO
+        # check if there is an argmin and render that one instead of none. 
+
         if index is None: 
             index = -1
         else:
             assert index <len(self.optimization_results) and index > 0 
+        if self.cfg.render_images.crop_around_mask:
+            if 'segmentation' in self.gt_tensors.keys():
+                crop = find_crop(self.gt_tensors['segmentation'][0])
+            else:
+                crop = find_crop(self.optimization_results[index][render_selection][0])
+
 
         if batch_index is None:
             # make a grid
+            if self.cfg.render_images.crop_around_mask:
+                gt_tensor = self.gt_tensors[render_selection][:,crop[0]:crop[0]+crop[2] + 1, crop[1]:crop[1]+crop[2] + 1,...]
+                gu_tensor = self.optimization_results[index][render_selection][:,crop[0]:crop[0]+crop[2] + 1, crop[1]:crop[1]+crop[2] + 1,...]
+            else:
+                gt_tensor = self.gt_tensors[render_selection]
+                gu_tensor = self.optimization_results[index][render_selection]
 
             img = make_grid_overlay_batch(
-                background = self.gt_tensors[render_selection], 
-                foreground = self.optimization_results[index][render_selection],  
+                background = gt_tensor, 
+                foreground = gu_tensor,  
                 alpha=self.cfg.render_images.alpha_overlay,
                 row =self.cfg.render_images.nrow,
                 final_width=self.cfg.render_images.final_width_batch,
@@ -1172,10 +1252,18 @@ class DiffDope:
 
             return img
         else:
-            # todo john
+
+            if self.cfg.render_images.crop_around_mask:
+                gt_tensor = self.gt_tensors[render_selection][batch_index,crop[0]:crop[0]+crop[2] + 1, crop[1]:crop[1]+crop[2] + 1,...]
+                gu_tensor = self.optimization_results[index][render_selection][batch_index,crop[0]:crop[0]+crop[2] + 1, crop[1]:crop[1]+crop[2] + 1,...]
+            else:
+                gt_tensor = self.gt_tensors[render_selection][batch_index]
+                gu_tensor = self.optimization_results[index][render_selection][batch_index]
+
+
             img = make_grid_overlay_batch(
-                background = self.gt_tensors[render_selection][i_guess].unsqueeze(0), 
-                foreground = self.optimization_results[index][render_selection][i_guess].unsqueeze(0),  
+                background = gt_tensor.unsqueeze(0), 
+                foreground = gu_tensor.unsqueeze(0),  
                 alpha=self.cfg.render_images.alpha_overlay,
                 row =self.cfg.render_images.nrow,
                 final_width=self.cfg.render_images.final_width_batch,
@@ -1185,59 +1273,68 @@ class DiffDope:
                 flip_result = self.cfg.render_images.flip_result
             )
 
-            return img
-            pass
+        return img
 
-        return None
+    def make_animation(self):
+        '''
+        Make an animation of the optimization to be saved. This uses the `render_img` function. 
+        '''
+
+        pass
+
 
     def run_optimization(self):
         '''
         If the class is set correctly this runs the optimization for finding a good pose
         '''
 
-        # print(self.object3d.forward())
-        result = self.object3d()
+        for it in range(opt.max_iter + 1):
 
-        # transform quat and position into a matrix44
-        mtx_gu = matrix_batch_44_from_position_quat(
-            p=result['trans'],
-            q=result['quat']
-        )
+            self.optimizer.zero_grad()
 
-        if self.object3d.mesh.has_textured_map is False:
-            renders = render_texture_batch(
-                            glctx=self.glctx,
-                            proj_cam=self.camera.cam_proj, 
-                            mtx = mtx_gu, 
-                            pos = result['pos'], 
-                            pos_idx = result['pos_idx'], 
-                            vtx_color= result['vtx_color'],
-                            resolution = self.resolution,
-                        )
-        else:
-            # TODO test the index color version
-            renders = render_texture_batch(
-                            glctx=self.glctx,
-                            proj_cam=self.camera.cam_proj, 
-                            mtx = mtx_gu, 
-                            pos = result['pos'], 
-                            pos_idx = result['pos_idx'], 
-                            uv = result['uv'], 
-                            uv_idx = result['uv_idx'],
-                            tex= result['tex'], 
-                            resolution = self.resolution,
-                        )  
+            result = self.object3d()
 
-        self.optimization_results.append(renders)
+            # transform quat and position into a matrix44
+            mtx_gu = matrix_batch_44_from_position_quat(
+                p=result['trans'],
+                q=result['quat']
+            )
 
-        # overlaying 
-        # how to save the optimization
-        # display different things and save them
-        # how to make the losses computations flexile
+            if self.object3d.mesh.has_textured_map is False:
+                renders = render_texture_batch(
+                                glctx=self.glctx,
+                                proj_cam=self.camera.cam_proj, 
+                                mtx = mtx_gu, 
+                                pos = result['pos'], 
+                                pos_idx = result['pos_idx'], 
+                                vtx_color= result['vtx_color'],
+                                resolution = self.resolution,
+                            )
+            else:
+                # TODO test the index color version
+                renders = render_texture_batch(
+                                glctx=self.glctx,
+                                proj_cam=self.camera.cam_proj, 
+                                mtx = mtx_gu, 
+                                pos = result['pos'], 
+                                pos_idx = result['pos_idx'], 
+                                uv = result['uv'], 
+                                uv_idx = result['uv_idx'],
+                                tex= result['tex'], 
+                                resolution = self.resolution,
+                            )  
+
+            self.optimization_results.append(renders)
+
+            # overlaying 
+            # how to save the optimization
+            # display different things and save them
+            # how to make the losses computations flexile
 
         img_batch = self.render_img()
         cv2.imwrite('img_batch.png',img_batch)
         img_0 = self.render_img(batch_index=0)
+        cv2.imwrite('img_single.png',img_0)
 
         
         # cv2.imwrite('tmp.png',im_renders)

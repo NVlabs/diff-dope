@@ -4,4 +4,9 @@ nvdiffrast@git+https://github.com/NVlabs/nvdiffrast.git
 omegaconf
 pyrr
 torch
-trimesh
+trimesh==3.21.5
+opencv-python
+pyglet==1.5.27
+pillow
+ninja
+icecream

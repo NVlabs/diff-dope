@@ -1,26 +1,36 @@
 ---
 camera:
-    fx: 125
-    fy: 130
-    cx: 200
-    cy: 200
-    im_width: 400
-    im_height: 400
-scene_path:
-    model_path: data/example/mesh/AlphabetSoup.obj
-    img: data/example/scene/rgb.png
-    depth: ''
-    segmentation: data/example/scene/seg.png
-pose:
-    position: [0, 0, 0]
-  # rotation can be a quaternion, matrix 3x3 flatten or not
-    rotation: [0, 0, 0, 1]
+    fx: 1390.53
+    fy: 1386.99
+    cx: 964.957
+    cy: 522.586
+    im_width: 1920
+    im_height: 1080
+scene:
+    path_img: data/example/scene/rgb.png
+    path_depth: data/example/scene/depth.png
+    path_segmentation: data/example/scene/seg.png
+    image_resize: 0.5
+object3d:
+    position: [-161.16877980209404, 205.22094040904116, 767.151333695172]
+    scale: 0.01
+    # rotation can be a quaternion, matrix 3x3 flatten or not
+    rotation: [-0.7913458966114294, 0.07584660081839613, 0.6066456668109877, 0.46529349746608056, 0.7183778584745024, 0.5171413865369608, -0.39657739866517305, 0.6915059982370961, -0.6037763006860087]
+    model_path: data/example/mesh/AlphabetSoup.ply
 hyperparameters:
     nb_iterations: 50
-    batchsize: 16
+    batchsize: 2
     learning_rates_bound: [0.01, 100]
     learning_rate_base: 20
     lr_decay: 0.01
     weight_rgb: 1
     weight_depth: 0.8
     weight_seg: 0.5
+render_images:
+    nrow: 4
+    final_width_batch: 2000
+    add_background: True
+    alpha_overlay: 0.5
+    add_countour: True
+    color_countour: [0.46,0.73,0]
+    flip_result: True

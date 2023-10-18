@@ -24,6 +24,11 @@ def main(cfg: DictConfig):
     # load the data for a scene to optimize
     images = dd.Images(path_rgb="", path_depth="", path_segmentation="")
 
+    ### oriented object
+    animation = d_dope.make_render(animation=True)
+    # or 
+    animation = dd.make_animation(d_dope)
+
     # update diff dope to have all this new data.
     d_dope.camera = cam
     d_dope.pose = pose

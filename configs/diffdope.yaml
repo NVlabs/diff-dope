@@ -25,7 +25,7 @@ losses:
     l1_mask: True
     weight_mask: 2
 hyperparameters:
-    nb_iterations: 50
+    nb_iterations: 20
     batchsize: 16
     base_lr: 20
     learning_rates_bound: [0.01, 100]

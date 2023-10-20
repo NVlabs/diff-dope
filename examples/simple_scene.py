@@ -2,15 +2,14 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 
 import diffdope as dd
-
+import os 
 
 @hydra.main(version_base=None, config_path="../configs/", config_name="diffdope")
 def main(cfg: DictConfig):
-
     ddope = dd.DiffDope(cfg=cfg)
 
     # ddope.pose.reset_pose()
-    # ddope.set_batchsize(16)
+    ddope.set_batchsize(16)
     # ddope.object3d.mesh.enable_gradients_texture()
     print(ddope)
     # img_dd = dd.Image(img_path="data/example/scene/rgb.png", img_resize=0.5)

@@ -33,6 +33,8 @@ from typing import Any, BinaryIO, List, Optional, Tuple, Union
 
 from PIL import Image as pilImage, ImageColor, ImageDraw, ImageFont
 from icecream import ic 
+from tqdm import tqdm
+
 
 # for better print debug
 print = ic
@@ -582,7 +584,6 @@ class Camera:
 
     def __post_init__(self):
         self.cam_proj = self.get_projection_matrix()
-        print(self.cam_proj)
 
     def set_batchsize(self, batchsize):
         """
@@ -1440,8 +1441,9 @@ class DiffDope:
             batch_index = self.get_argmin()
 
         # Loop through the list of images and add each frame to the video
-        for iteration_now in range(self.cfg.hyperparameters.nb_iterations + 1):
-
+        pbar = tqdm(range(self.cfg.hyperparameters.nb_iterations + 1))
+        for iteration_now in pbar:
+            pbar.set_description('making video')
             # Ensure the image is in BGR format (OpenCV default)
             img = self.render_img(index=iteration_now, batch_index=batch_index)
             writer.append_data(cv2.cvtColor(img,cv2.COLOR_BGR2RGB))
@@ -1508,6 +1510,22 @@ class DiffDope:
 
         return image_rgb
 
+    def get_pose(self,batch_index=-1):
+        '''
+        return the matrix pose as a np.ndarray
+
+        Args: 
+            batch_index (int): if -1 use argmin function.   
+
+        Returns a 4x4 np.ndarray
+        '''
+        if batch_index == -1: 
+            batch_index = self.get_argmin()
+
+        matrix44 = self.optimization_results[-1]['mtx'][batch_index].numpy()
+
+        return matrix44
+
     def run_optimization(self):
         '''
         If the class is set correctly this runs the optimization for finding a good pose
@@ -1516,8 +1534,9 @@ class DiffDope:
         self.losses_values = {}
         self.optimization_results = []
 
-        for iteration_now in range(self.cfg.hyperparameters.nb_iterations + 1):
-            print(iteration_now)
+        pbar = tqdm(range(self.cfg.hyperparameters.nb_iterations + 1))
+
+        for iteration_now in pbar:
 
             itf = iteration_now / self.cfg.hyperparameters.nb_iterations + 1
             lr = self.cfg.hyperparameters.base_lr * self.cfg.hyperparameters.lr_decay**itf
@@ -1561,6 +1580,7 @@ class DiffDope:
             to_add = {}
             to_add['rgb'] = self.renders['rgb'].detach().cpu()
             to_add['depth'] = self.renders['depth'].detach().cpu()
+            to_add['mtx'] = mtx_gu.detach().cpu()
 
             self.optimization_results.append(to_add)
 
@@ -1571,19 +1591,9 @@ class DiffDope:
                 if l is None:
                     continue
                 loss += l
-
+            pbar.set_description(f"loss: {loss.item():.4f}")
             loss.backward()
             self.optimizer.step()
-
-
-        img = self.plot_losses()
-
-        self.make_animation(output_file_path='tmp.mp4')
-        # cv2.imwrite('img_batch.png',self.render_img())
-        # cv2.imwrite('img_single.png',self.render_img(batch_index=self.get_argmin()))
-        # cv2.imwrite('img_losses.png',self.plot_losses())
-
-
 
     def cuda(self):
         """

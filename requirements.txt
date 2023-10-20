@@ -10,3 +10,4 @@ pyglet==1.5.27
 pillow
 ninja
 icecream
+tdqm

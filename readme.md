@@ -8,6 +8,25 @@ A 6-DoF pose refiner that takes as input an image, a 3d model, and an initial ob
 
 Code and data to be release soon (pending internal approval).
 
+## Installation
+```bash
+pip install -r requirements.txt
+pip install -e . 
+```
+
+## Running simple example
+From the root folder of the this repo call. 
+```bash
+python examples/simple_example.py
+```
+You should see an object pose express as a matrix displayed. 
+
+
+## Features and TODO
+- Add a point cloud visualizer to check the output pose, use open 3d 
+- Add an example that runs on the data format bop
+- Add an example that uses a 3rd party neural network to add as a loss, canny detection, latent space 
+
 ## Development notes
 
 Pre-commit hooks are available to ensure code quality. To install them, run:

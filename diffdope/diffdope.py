@@ -1404,7 +1404,7 @@ class DiffDope:
 
         # Find the argmin of the average tensor
         argmin = torch.argmin(average_tensor, dim=-1)
-        
+
         return argmin
 
     def make_animation(self):
@@ -1530,6 +1530,7 @@ class DiffDope:
 
         cv2.imwrite('img_batch.png',self.render_img())
         cv2.imwrite('img_single.png',self.render_img(batch_index=self.get_argmin()))
+        
         self.plot_losses()
         # for i in range(self.cfg.hyperparameters.nb_iterations + 1):   
         #     print(i)     

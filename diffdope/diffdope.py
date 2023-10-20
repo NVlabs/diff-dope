@@ -3,7 +3,7 @@ import logging
 import matplotlib
 matplotlib.use('Agg')
 
-
+import io 
 import cv2
 import hydra
 import numpy as np
@@ -21,22 +21,27 @@ from dataclasses import dataclass
 
 import collections
 import math
+import imageio
 import pathlib
 import warnings
+import hydra.utils as hydra_utils
+
+
 from itertools import repeat
 from types import FunctionType
 from typing import Any, BinaryIO, List, Optional, Tuple, Union
 
-from PIL import Image, ImageColor, ImageDraw, ImageFont
+from PIL import Image as pilImage, ImageColor, ImageDraw, ImageFont
 from icecream import ic 
 
 # for better print debug
 print = ic
 
 
-
 # A logger for this file
 log = logging.getLogger(__name__)
+
+
 
 def matrix_batch_44_from_position_quat(q,p):
     '''
@@ -1407,12 +1412,43 @@ class DiffDope:
         
         return argmin
 
-    def make_animation(self):
+    def make_animation(self, output_file_path=None,frame_rate=20,batch_index = -1):
         '''
         Make an animation of the optimization to be saved. This uses the `render_img` function. 
+        
+        Args: 
+            output_file_path (str): output path, if None, this goes into the hydra tmp folder. 
+            frame_rate (int): video frame rate
+            batch_index (int): if -1 use argmin function. 
         '''
 
-        pass
+        if output_file_path is None:
+            hydra_cfg = hydra.core.hydra_config.HydraConfig.get()
+            output_file_path = f"{hydra_cfg['runtime']['output_dir']}/animation.mp4"
+
+
+        # Set the frame rate (change this value as needed)
+        frame_rate = 10
+
+        # Get the dimensions of the first image (assuming all images have the same dimensions)
+        height, width = self.resolution
+
+        # Create a VideoWriter object to save the MP4 video (use 'XVID' codec for MP4)
+        writer = imageio.get_writer(output_file_path, mode='I', fps=frame_rate, codec='libx264', bitrate='16M')
+
+        if batch_index == -1:      
+            batch_index = self.get_argmin()
+
+        # Loop through the list of images and add each frame to the video
+        for iteration_now in range(self.cfg.hyperparameters.nb_iterations + 1):
+
+            # Ensure the image is in BGR format (OpenCV default)
+            img = self.render_img(index=iteration_now, batch_index=batch_index)
+            writer.append_data(cv2.cvtColor(img,cv2.COLOR_BGR2RGB))
+
+        # Release the VideoWriter to save the MP4 video
+        writer.close()
+
 
     def add_loss_value(self, key, values, values_weighted=None):
         '''
@@ -1446,16 +1482,31 @@ class DiffDope:
         if len(self.losses_values.keys()) == 0:
             return None
 
-        argmin = self.get_argmin()
+        if batch_index == -1:
+            batch_index = self.get_argmin()
 
         plt.figure(figsize=(10, 6))  # Adjust the figure size as needed
 
-        # Plot the argmin values as lines
+        # Plot the batch_index values as lines
         for i, key in enumerate(self.losses_values.keys()):
-            plt.plot(self.losses_values[key][...,argmin].numpy(), marker='o', label=key)
+            plt.plot(self.losses_values[key][...,batch_index].numpy(), marker='o', label=key)
         # plt.show()
         plt.legend()
-        plt.savefig('argmin_plot.png', bbox_inches='tight')
+
+        buffer = io.BytesIO()
+
+        # Save the plot to the buffer instead of a file
+        plt.savefig(buffer, format='png', bbox_inches='tight')
+        buffer.seek(0)
+
+        # Convert the PIL image to a NumPy array
+        pil_image = pilImage.open(buffer)
+        numpy_array = np.array(pil_image)
+        image_rgb = cv2.cvtColor(numpy_array, cv2.COLOR_BGR2RGB)
+        # Close the plot to release resources
+        plt.close()
+
+        return image_rgb
 
     def run_optimization(self):
         '''
@@ -1527,14 +1578,10 @@ class DiffDope:
 
         img = self.plot_losses()
 
-
-        cv2.imwrite('img_batch.png',self.render_img())
-        cv2.imwrite('img_single.png',self.render_img(batch_index=self.get_argmin()))
-        self.plot_losses()
-        # for i in range(self.cfg.hyperparameters.nb_iterations + 1):   
-        #     print(i)     
-        #     img_0 = self.render_img(index=i,batch_index=self.get_argmin())
-        #     cv2.imwrite(f'tmp/{str(i).zfill(3)}.png',img_0)
+        self.make_animation(output_file_path='tmp.mp4')
+        # cv2.imwrite('img_batch.png',self.render_img())
+        # cv2.imwrite('img_single.png',self.render_img(batch_index=self.get_argmin()))
+        # cv2.imwrite('img_losses.png',self.plot_losses())
 
 
 

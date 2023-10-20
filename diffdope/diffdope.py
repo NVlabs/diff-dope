@@ -1,13 +1,19 @@
 import logging
 
+import matplotlib
+matplotlib.use('Agg')
+
+
 import cv2
 import hydra
 import numpy as np
 import pyrr
 import torch
+import random
 import trimesh
 import diffdope as dd 
 import nvdiffrast.torch as dr
+import matplotlib.pyplot as plt
 
 from typing import Optional
 from omegaconf import DictConfig, OmegaConf
@@ -23,6 +29,8 @@ from typing import Any, BinaryIO, List, Optional, Tuple, Union
 
 from PIL import Image, ImageColor, ImageDraw, ImageFont
 from icecream import ic 
+
+# for better print debug
 print = ic
 
 
@@ -52,17 +60,6 @@ def matrix_batch_44_from_position_quat(q,p):
     
     return rr
 
-def dist_batch_lr(tensor, learning_rates, channels=[1, 2, 3]):
-    """
-    Method that distribute different learning rates to the batch.
-
-    Args:
-        tensor (torch.tensor): BxWxHxC if you do not have C, pass a different set of channel, for example you could run on a depth map [1,2].
-        learning_rates (torch.tensor): B the different learning rates needed.
-        channels (list): the index values used to apply the first mean, e.g., [1,2,3] for colored image, or [1,2] for a depth map
-    """
-
-    return torch.mean((torch.mean(tensor, channels) * learning_rates))
 
 
 def opencv_2_opengl(p, q):
@@ -125,6 +122,7 @@ def interpolate(attr, rast, attr_idx, rast_db=None):
 
 def render_texture_batch(glctx, proj_cam, mtx, pos, pos_idx, resolution, 
         uv=None, uv_idx=None, tex=None, vtx_color=None,
+        return_rast_out = False
     ):
     '''
     Functions that maps 3d objects to the nvdiffrast rendering. This function uses the color of the texture of the model or the vertex color. 
@@ -142,6 +140,7 @@ def render_texture_batch(glctx, proj_cam, mtx, pos, pos_idx, resolution,
     uv_idx (torch.tensor): (b,nb_points,3) defining each texture triangle 
     tex (torch.tensor): (b,w,h,3) batch image of the texture
     vtx_color (torch.tensor): (b,nb_points,3) the color of each vertex, this is used when the texture is not defined
+    return_rast_out (bool): return the nvdiffrast output
 
     Return: 
         returns a dict with key 'rgb','depth', and 'rast_out'
@@ -185,11 +184,12 @@ def render_texture_batch(glctx, proj_cam, mtx, pos, pos_idx, resolution,
     else:
         color, _ = dr.interpolate(vtx_color, rast_out, pos_idx[0])
         color = color * torch.clamp(rast_out[..., -1:], 0, 1) # Mask out background.
- 
+    if not return_rast_out: 
+        rast_out = None
     return {
         'rgb':color, 
         'depth':depth, 
-        'rast_out':rast_out
+        'rast_out': rast_out
     }
 
 
@@ -465,7 +465,89 @@ def make_grid_overlay_batch(
 
     return blended_image
 
+##############################################################################
+# LOSSES
+##############################################################################
+def dist_batch_lr(tensor, learning_rates, channels=[1, 2, 3]):
+    """
+    Method that distribute different learning rates to the batch.
 
+    Args:
+        tensor (torch.tensor): BxWxHxC if you do not have C, pass a different set of channel, for example you could run on a depth map [1,2].
+        learning_rates (torch.tensor): B the different learning rates needed.
+        channels (list): the index values used to apply the first mean, e.g., [1,2,3] for colored image, or [1,2] for a depth map
+    """
+
+    return (torch.mean(tensor, channels) * learning_rates)
+
+def l1_rgb_with_mask(ddope):
+    '''
+    Computes the l1_rgb on a DiffDOPE object, simpler to pass the object. 
+    '''
+
+    diff_rgb = torch.abs((ddope.renders['rgb'] - ddope.gt_tensors['rgb'])*ddope.gt_tensors['segmentation'])
+    lr_diff_rgb = dist_batch_lr(diff_rgb, ddope.learning_rates)
+
+    ddope.add_loss_value('rgb',
+        torch.mean(diff_rgb.detach(), (1,2,3)) * ddope.cfg.losses.weight_rgb
+    )
+
+    return lr_diff_rgb.mean() * ddope.cfg.losses.weight_rgb
+
+def l1_depth_with_mask(ddope):
+    '''
+    Computes the l1_depth on a DiffDOPE object, simpler to pass the object. 
+    '''
+
+    diff_depth = torch.abs((ddope.renders['depth'] - ddope.gt_tensors['depth'])*ddope.gt_tensors['segmentation'][...,0])
+    lr_diff_depth = dist_batch_lr(diff_depth, ddope.learning_rates,[1,2])
+
+    ddope.add_loss_value('depth',
+        torch.mean(diff_depth.detach(),
+            (1,2)) * ddope.cfg.losses.weight_depth
+    )
+
+
+
+    return lr_diff_depth.mean() * ddope.cfg.losses.weight_depth
+
+def l1_mask(ddope):
+    '''
+    Computes the L1-on mask on a DiffDOPE object.
+
+    Args:
+    - ddope: A DiffDOPE object containing the necessary data.
+
+    Returns:
+    - lr_diff_mask_mean: The mean of the L1-on mask loss multiplied by the weight specified in the configuration.
+    '''
+    
+    # Create the L1-on mask from the depth
+    mask = ddope.renders['rgb'] > 0
+    mask = mask.to(torch.float32)
+    # Add the mask to the optimization results
+    ddope.optimization_results[-1]['mask'] = mask.detach().cpu()
+
+    # Compute the difference between the mask and ground truth segmentation
+    diff_mask = torch.abs(mask - ddope.gt_tensors['segmentation'])
+
+    # Compute the L1-on mask loss with batch-wise learning rates
+    lr_diff_mask = dist_batch_lr(diff_mask, ddope.learning_rates)
+
+    # Add the L1-on mask loss to the DiffDOPE object
+    ddope.add_loss_value('mask_selection',
+        torch.mean(torch.abs(diff_mask.detach()),(1,2,3)) * ddope.cfg.losses.weight_mask
+    )
+
+
+
+    # Calculate the mean of the L1-on mask loss and apply the weight from the configuration
+    lr_diff_mask_mean = lr_diff_mask.mean() * ddope.cfg.losses.weight_mask
+
+    return lr_diff_mask_mean
+##############################################################################
+# CLASSES
+##############################################################################
 
 @dataclass
 class Camera:
@@ -715,7 +797,6 @@ class Mesh(torch.nn.Module):
         # TODO tex does not seem to be correct in its shape
 
         for key, value in vars(self).items():
-            print(key)
             if not key in self.to_process:
                 continue
             if self._batchsize_set is False:
@@ -764,6 +845,10 @@ class Mesh(torch.nn.Module):
             if not key in self.to_process:
                 continue
             to_return[key] = vars(self)[key]
+        # if not 'tex' in to_return:
+        #     to_return['tex'] = self.tex
+        # elif not 'vtx_color' in to_return:
+        #     to_return['vtx_color'] = self.vtx_color
         return to_return  
 
 
@@ -964,10 +1049,11 @@ class Image:
         if not self.img_path is None:
             if self.depth:
                 im = cv2.imread(self.img_path, cv2.IMREAD_UNCHANGED) / self.depth_scale
-                im = cv2.flip(im,0)
             else:
                 im = cv2.imread(self.img_path)[:, :, :3]
                 im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+                # normalize
+                im = im/ 255.0
             if self.flip_img:
                 im = cv2.flip(im,0)
 
@@ -989,9 +1075,10 @@ class Image:
                             int(im.shape[0] * self.img_resize),
                         ),
                     )
-            self.img_tensor = torch.tensor(im).float() / 255.0
+            self.img_tensor = torch.tensor(im).float() 
             log.info(f"Loaded image {self.img_path}, shape: {self.img_tensor.shape}")
-    
+        self._batchsize_set = False
+
     def __repr__(self):
         return f"{self.img_tensor.shape} @ {self.img_path} on {self.img_tensor.device}"
 
@@ -1011,8 +1098,10 @@ class Image:
         Args:
             batchsize (int): batchsize for the tensor        
         """
-        if len(self.img_tensor.shape) == 3:
+        if self._batchsize_set is False:
             self.img_tensor = torch.stack([self.img_tensor] * batchsize, dim=0)
+            self._batchsize_set = True
+
         else:
             self.img_tensor = torch.stack([self.img_tensor[0]] * batchsize, dim=0)
 
@@ -1103,13 +1192,16 @@ class DiffDope:
         gt_tensors (dict): a dict for `{'rgb','depth','segmentation'}' to access the torch tensor directly. 
             This is useful for the image generation and for the losses defined by users.
             Moreover extent this so you can render your special losses. See examples. 
+        loss_functions (list): a list of function for the losses to be computed. See examples for how you could write yours. 
+        losses_values (dict): losses value per loss term and per image. 
     """
 
-    cfg: Optional[DictConfig] = None
+    cfg: [DictConfig] = None
     camera: Optional[Camera] = None
     object3d: Optional[Object3D] = None
     scene: Optional[Scene] = None
     resolution: Optional[list] = None
+    batchsize: Optional[int] = 16
 
     # TODO:
     # storing the renders for the optimization
@@ -1118,16 +1210,16 @@ class DiffDope:
     # driven by the cfg
 
     def __post_init__(self):
-        if not self.cfg is None:
-            if self.camera is None:
-                # load the camera from the config
-                self.camera = Camera(**self.cfg.camera)
-            # print(self.pose.position)
-            if self.object3d is None:
-                self.object3d = Object3D(**self.cfg.object3d)
-            if self.scene is None:
-                self.scene = Scene(**self.cfg.scene)
 
+        if self.camera is None:
+            # load the camera from the config
+            self.camera = Camera(**self.cfg.camera)
+        # print(self.pose.position)
+        if self.object3d is None:
+            self.object3d = Object3D(**self.cfg.object3d)
+        if self.scene is None:
+            self.scene = Scene(**self.cfg.scene)
+        self.batchsize = self.cfg.hyperparameters.batchsize
 
         # load the rendering
         self.glctx = dr.RasterizeGLContext()
@@ -1139,6 +1231,7 @@ class DiffDope:
 
 
         self.gt_tensors = {}
+
         if self.scene.tensor_rgb is not None:
             self.gt_tensors['rgb'] = self.scene.tensor_rgb.img_tensor
         if self.scene.tensor_depth is not None:
@@ -1146,12 +1239,23 @@ class DiffDope:
         if self.scene.tensor_segmentation is not None:
             self.gt_tensors['segmentation'] = self.scene.tensor_segmentation.img_tensor
 
-        self.set_batchsize(self.cfg.hyperparameters.batchsize)
+        self.set_batchsize(self.batchsize)
 
+        # Storing the values for losses display
+        self.losses_values = {}
 
+        self.loss_functions = []
+        if self.cfg.losses.l1_rgb_with_mask:
+            self.loss_functions.append(dd.l1_rgb_with_mask)         
+        if self.cfg.losses.l1_depth_with_mask:
+            self.loss_functions.append(dd.l1_depth_with_mask)
+        if self.cfg.losses.l1_mask:
+            self.loss_functions.append(dd.l1_mask)
+
+        # self.object3d.mesh.enable_gradients_texture()
 
         # logging
-        log.info(f'batchsize is {self.cfg.hyperparameters.batchsize}')
+        log.info(f'batchsize is {self.batchsize}')
         log.info(self.object3d)
         log.info(self.scene)
 
@@ -1162,7 +1266,7 @@ class DiffDope:
         Args
         batchsize (int): batchsize format
         '''
-
+        self.batchsize = batchsize
         self.scene.set_batchsize(batchsize)
         self.object3d.set_batchsize(batchsize)
         self.camera.set_batchsize(batchsize)
@@ -1177,15 +1281,17 @@ class DiffDope:
         if self.scene.tensor_segmentation is not None:
             self.gt_tensors['segmentation'] = self.scene.tensor_segmentation.img_tensor
 
-        for name, param in self.object3d.named_parameters():
-            print(f"Parameter name: {name}")
-            print(f"Parameter shape: {param.shape}")
-            # print(f"Parameter values: {param}")
-
         self.optimizer = torch.optim.SGD(
             self.object3d.parameters(), 
-            lr=1
+            lr=self.cfg.hyperparameters.learning_rate_base
         )
+
+        # TODO add a seed to the random
+        self.learning_rates = [
+            random.uniform(
+                self.cfg.hyperparameters.learning_rates_bound[0], 
+                self.cfg.hyperparameters.learning_rates_bound[1]) for _ in range(batchsize)]
+        self.learning_rates = torch.tensor(self.learning_rates).float().cuda()
 
     def render_img(self,index=None, 
             batch_index=None, 
@@ -1221,7 +1327,8 @@ class DiffDope:
         if index is None: 
             index = -1
         else:
-            assert index <len(self.optimization_results) and index > 0 
+            assert index < len(self.optimization_results) and index >= 0 
+
         if self.cfg.render_images.crop_around_mask:
             if 'segmentation' in self.gt_tensors.keys():
                 crop = find_crop(self.gt_tensors['segmentation'][0])
@@ -1252,7 +1359,6 @@ class DiffDope:
 
             return img
         else:
-
             if self.cfg.render_images.crop_around_mask:
                 gt_tensor = self.gt_tensors[render_selection][batch_index,crop[0]:crop[0]+crop[2] + 1, crop[1]:crop[1]+crop[2] + 1,...]
                 gu_tensor = self.optimization_results[index][render_selection][batch_index,crop[0]:crop[0]+crop[2] + 1, crop[1]:crop[1]+crop[2] + 1,...]
@@ -1274,6 +1380,32 @@ class DiffDope:
             )
 
         return img
+    def get_argmin(self):
+        '''
+        Returns the argmin of all the losses put together
+        '''
+        # Calculate the average tensor across all keys at the last time step
+        last_time_step = -1  # Index for the last time step
+
+        # average_tensor = torch.stack([tensor[last_time_step] for tensor in self.losses_values.values()]).mean(dim=0)
+
+        tensor_list = []
+
+        # Extract tensors at the last time step for each key and add to the list
+        for key, tensor in self.losses_values.items():
+            tensor_at_last_time_step = tensor[last_time_step]
+            tensor_list.append(tensor_at_last_time_step)
+
+        # Stack the list of tensors along dimension 0 to create a single tensor
+        stacked_tensor = torch.stack(tensor_list, dim=0)
+
+        # Calculate the mean along dimension 0 to get the average tensor
+        average_tensor = stacked_tensor.mean(dim=0)
+
+        # Find the argmin of the average tensor
+        argmin = torch.argmin(average_tensor, dim=-1)
+        
+        return argmin
 
     def make_animation(self):
         '''
@@ -1282,13 +1414,65 @@ class DiffDope:
 
         pass
 
+    def add_loss_value(self, key, values, values_weighted=None):
+        '''
+        Store in `losses_values` the values of different loss term at for all the objects
+            This function adds to the list of values, thus if you call multiple times on the same key, values are just added and not checked. 
+        Args:
+            key (str): key to be store in the dict 
+            values (torch.tensor): B of size to be stored at key
+        '''
+
+        if key not in self.losses_values:
+            self.losses_values[key] = values.detach().cpu().unsqueeze(0)  # Create an empty tensor of the same data type
+        else:
+            # Append the new values (assuming values is a 1D tensor)
+            self.losses_values[key] = torch.cat((self.losses_values[key], values.detach().cpu().unsqueeze(0)), dim=0)
+
+    def plot_losses(self,keys = None, batch_index = -1): 
+        '''
+        Plot the losses value
+
+        Args: 
+            keys (list(str)): keys you want to plot, if None, all are plotted. 
+            including_weighting (bool): do you want to include the weighting 
+            batch_index (int): if -1 returns the argmin uses.
+
+        Returns: 
+            returns a nd.array as image
+
+        '''
+
+        if len(self.losses_values.keys()) == 0:
+            return None
+
+        argmin = self.get_argmin()
+
+        plt.figure(figsize=(10, 6))  # Adjust the figure size as needed
+
+        # Plot the argmin values as lines
+        for i, key in enumerate(self.losses_values.keys()):
+            plt.plot(self.losses_values[key][...,argmin].numpy(), marker='o', label=key)
+        # plt.show()
+        plt.legend()
+        plt.savefig('argmin_plot.png', bbox_inches='tight')
 
     def run_optimization(self):
         '''
         If the class is set correctly this runs the optimization for finding a good pose
         '''
 
-        for it in range(opt.max_iter + 1):
+        self.losses_values = {}
+        self.optimization_results = []
+
+        for iteration_now in range(self.cfg.hyperparameters.nb_iterations + 1):
+            print(iteration_now)
+
+            itf = iteration_now / self.cfg.hyperparameters.nb_iterations + 1
+            lr = self.cfg.hyperparameters.base_lr * self.cfg.hyperparameters.lr_decay**itf
+
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = lr
 
             self.optimizer.zero_grad()
 
@@ -1301,7 +1485,7 @@ class DiffDope:
             )
 
             if self.object3d.mesh.has_textured_map is False:
-                renders = render_texture_batch(
+                self.renders = render_texture_batch(
                                 glctx=self.glctx,
                                 proj_cam=self.camera.cam_proj, 
                                 mtx = mtx_gu, 
@@ -1312,7 +1496,7 @@ class DiffDope:
                             )
             else:
                 # TODO test the index color version
-                renders = render_texture_batch(
+                self.renders = render_texture_batch(
                                 glctx=self.glctx,
                                 proj_cam=self.camera.cam_proj, 
                                 mtx = mtx_gu, 
@@ -1323,21 +1507,35 @@ class DiffDope:
                                 tex= result['tex'], 
                                 resolution = self.resolution,
                             )  
+            to_add = {}
+            to_add['rgb'] = self.renders['rgb'].detach().cpu()
+            to_add['depth'] = self.renders['depth'].detach().cpu()
 
-            self.optimization_results.append(renders)
+            self.optimization_results.append(to_add)
 
-            # overlaying 
-            # how to save the optimization
-            # display different things and save them
-            # how to make the losses computations flexile
+            # computing the losses
+            loss = torch.zeros(1).cuda()
+            for loss_function in self.loss_functions: 
+                l = loss_function(self)
+                if l is None:
+                    continue
+                loss += l
 
-        img_batch = self.render_img()
-        cv2.imwrite('img_batch.png',img_batch)
-        img_0 = self.render_img(batch_index=0)
-        cv2.imwrite('img_single.png',img_0)
+            loss.backward()
+            self.optimizer.step()
 
-        
-        # cv2.imwrite('tmp.png',im_renders)
+
+        img = self.plot_losses()
+
+
+        cv2.imwrite('img_batch.png',self.render_img())
+        cv2.imwrite('img_single.png',self.render_img(batch_index=self.get_argmin()))
+        self.plot_losses()
+        # for i in range(self.cfg.hyperparameters.nb_iterations + 1):   
+        #     print(i)     
+        #     img_0 = self.render_img(index=i,batch_index=self.get_argmin())
+        #     cv2.imwrite(f'tmp/{str(i).zfill(3)}.png',img_0)
+
 
 
     def cuda(self):

@@ -14,10 +14,10 @@ pip install -r requirements.txt
 pip install -e . 
 ```
 
-## Running simple example
+## Running simple scene
 From the root folder of the this repo call. 
 ```bash
-python examples/simple_example.py
+python examples/simple_scene.py
 ```
 You should see an object pose express as a matrix displayed. 
 

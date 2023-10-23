@@ -15,12 +15,12 @@ conda activate diffdope
 pip install -e .
 ```
 
-## Running simple scene
-From the root folder of the this repo call.
+## Run simple scene
+From the root folder of the this repository, call:
 ```bash
 python examples/simple_scene.py
 ```
-You should see an object pose express as a matrix displayed.
+The first run will compile several CUDA kernels, which will take a brief amount of time. Subsequent runs will be faster. After the script finishes, you should see the resulting object pose displayed as a matrix, as well as a filename for a video animation of the optimization process.
 
 
 ## Features and TODO

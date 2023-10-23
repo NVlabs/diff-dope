@@ -15,14 +15,15 @@ object3d:
     position: [-161.16877980209404, 206.22094040904116, 747.151333695172]
     scale: 0.01
     # rotation can be a quaternion, matrix 3x3 flatten or not
-    rotation: [-0.7913458966114294, 0.07584660081839613, 0.6066456668109877, 0.46529349746608056, 0.7183778584745024, 0.5171413865369608, -0.39657739866517305, 0.6915059982370961, -0.6037763006860087]
+    rotation: [-0.7913458966114294, 0.07584660081839613, 0.6066456668109877, 0.46529349746608056, 0.7183778584745024, 0.5171413865369608, -0.39657739866517305,
+        0.6915059982370961, -0.6037763006860087]
     model_path: data/example/mesh/AlphabetSoup.ply
-losses: 
-    l1_rgb_with_mask: True
+losses:
+    l1_rgb_with_mask: true
     weight_rgb: 0.7
-    l1_depth_with_mask: True
+    l1_depth_with_mask: true
     weight_depth: 1
-    l1_mask: True
+    l1_mask: true
     weight_mask: 2
 hyperparameters:
     nb_iterations: 20
@@ -34,9 +35,9 @@ hyperparameters:
 render_images:
     nrow: 4
     final_width_batch: 2000
-    add_background: True
+    add_background: true
     alpha_overlay: 0.7
-    add_countour: True
-    color_countour: [0.46,0.73,0]
-    flip_result: True
-    crop_around_mask: True
+    add_countour: true
+    color_countour: [0.46, 0.73, 0]
+    flip_result: true
+    crop_around_mask: true

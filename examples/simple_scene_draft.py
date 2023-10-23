@@ -26,7 +26,7 @@ def main(cfg: DictConfig):
 
     ### oriented object
     animation = d_dope.make_render(animation=True)
-    # or 
+    # or
     animation = dd.make_animation(d_dope)
 
     # update diff dope to have all this new data.

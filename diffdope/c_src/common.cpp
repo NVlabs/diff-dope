@@ -2,10 +2,10 @@
  * Copyright (c) 2020-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
- * property and proprietary rights in and to this material, related 
- * documentation and any modifications thereto. Any use, reproduction, 
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
  * disclosure or distribution of this material and related documentation
- * without an express license agreement from NVIDIA CORPORATION or 
+ * without an express license agreement from NVIDIA CORPORATION or
  * its affiliates is strictly prohibited.
  */
 
@@ -56,8 +56,8 @@ dim3 getLaunchBlockSize(int maxWidth, int maxHeight, dim3 dims)
 dim3 getWarpSize(dim3 blockSize)
 {
     return dim3(
-        std::min(blockSize.x, 32u), 
-        std::min(std::max(32u / blockSize.x, 1u), std::min(32u, blockSize.y)), 
+        std::min(blockSize.x, 32u),
+        std::min(std::max(32u / blockSize.x, 1u), std::min(32u, blockSize.y)),
         std::min(std::max(32u / (blockSize.x * blockSize.y), 1u), std::min(32u, blockSize.z))
     );
 }

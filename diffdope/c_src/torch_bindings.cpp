@@ -2,14 +2,14 @@
  * Copyright (c) 2020-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
- * property and proprietary rights in and to this material, related 
- * documentation and any modifications thereto. Any use, reproduction, 
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
  * disclosure or distribution of this material and related documentation
- * without an express license agreement from NVIDIA CORPORATION or 
+ * without an express license agreement from NVIDIA CORPORATION or
  * its affiliates is strictly prohibited.
  */
 
-#ifdef _MSC_VER 
+#ifdef _MSC_VER
 #pragma warning(push, 0)
 #include <torch/extension.h>
 #pragma warning(pop)
@@ -260,7 +260,7 @@ torch::Tensor xfm_bwd_mtx(torch::Tensor points, torch::Tensor matrix, torch::Ten
     // To reduce contention
     unsigned int padFactor = std::max(std::min(points.size(1), (int64_t)16), std::min( (int64_t)16384, (int64_t)(points.size(1) / 256)));
     p.padFactor = padFactor;
-    
+
     torch::Tensor points_grad, matrix_grad_pad;
     p.points = make_cuda_tensor(points, p.gridSize);
     p.matrix = make_cuda_tensor_clear(matrix, matSize, padFactor, &matrix_grad_pad);

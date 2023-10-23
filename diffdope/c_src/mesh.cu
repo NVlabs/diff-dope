@@ -2,10 +2,10 @@
  * Copyright (c) 2020-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
- * property and proprietary rights in and to this material, related 
- * documentation and any modifications thereto. Any use, reproduction, 
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
  * disclosure or distribution of this material and related documentation
- * without an express license agreement from NVIDIA CORPORATION or 
+ * without an express license agreement from NVIDIA CORPORATION or
  * its affiliates is strictly prohibited.
  */
 
@@ -28,7 +28,7 @@ __global__ void xfmPointsFwdKernel(XfmKernelParams p)
     if (threadIdx.x < 16)
         mtx[threadIdx.x % 4][threadIdx.x / 4] = p.matrix.fetch(p.matrix.nhwcIndex(pz, threadIdx.x / 4, threadIdx.x % 4, 0));
     __syncthreads();
-    
+
     if (px >= p.gridSize.x)
         return;
 
@@ -54,7 +54,7 @@ __global__ void xfmPointsFwdKernel(XfmKernelParams p)
 }
 
 __global__ void xfmPointsBwdKernel(XfmKernelParams p)
-{ 
+{
     unsigned int px = blockIdx.x * blockDim.x + threadIdx.x;
     unsigned int pz = blockIdx.z * blockDim.z + threadIdx.z;
 
@@ -94,7 +94,7 @@ __global__ void xfmPointsBwdKernel(XfmKernelParams p)
 }
 
 __global__ void xfmPointsBwdFullKernel(XfmKernelParams p)
-{ 
+{
     unsigned int px = blockIdx.x * blockDim.x + threadIdx.x;
     unsigned int pz = blockIdx.z * blockDim.z + threadIdx.z;
 
@@ -163,7 +163,7 @@ __global__ void xfmPointsBwdFullKernel(XfmKernelParams p)
 }
 
 __global__ void xfmPointsBwdMtxKernel(XfmKernelParams p)
-{ 
+{
     unsigned int px = blockIdx.x * blockDim.x + threadIdx.x;
     unsigned int pz = blockIdx.z * blockDim.z + threadIdx.z;
 

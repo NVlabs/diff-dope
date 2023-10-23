@@ -10,22 +10,23 @@ Code and data to be release soon (pending internal approval).
 
 ## Installation
 ```bash
-pip install -r requirements.txt
-pip install -e . 
+conda create -n diffdope python=3.9
+conda activate diffdope
+pip install -e .
 ```
 
 ## Running simple scene
-From the root folder of the this repo call. 
+From the root folder of the this repo call.
 ```bash
 python examples/simple_scene.py
 ```
-You should see an object pose express as a matrix displayed. 
+You should see an object pose express as a matrix displayed.
 
 
 ## Features and TODO
-- Add a point cloud visualizer to check the output pose, use open 3d 
+- Add a point cloud visualizer to check the output pose, use open 3d
 - Add an example that runs on the data format bop
-- Add an example that uses a 3rd party neural network to add as a loss, canny detection, latent space 
+- Add an example that uses a 3rd party neural network to add as a loss, canny detection, latent space
 
 ## Development notes
 
@@ -40,4 +41,4 @@ To manually run the hooks without making a commit, call:
 
 ```bash
 pre-commit run --all-files
-``
+```

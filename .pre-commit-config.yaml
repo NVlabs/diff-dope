@@ -51,9 +51,4 @@ repos:
           # > It does not check for word membership in a complete dictionary,
           # > but instead looks for a set of common misspellings.
           - id: codespell
-
-    - repo: https://github.com/crate-ci/typos
-      rev: v1.16.15
-      hooks:
-          - id: typos
-            args: []  # will report typos without attempting to fix them
+            args: ['-L dout,nd']

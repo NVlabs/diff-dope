@@ -6,23 +6,23 @@ setup(
     packages=find_packages(),
     install_requires=[
         "hydra-core",
+        "icecream",
+        "imageio[ffmpeg]",
+        "matplotlib",
+        "ninja",
         "numpy",
         "nvdiffrast@git+https://github.com/NVlabs/nvdiffrast.git",
         "omegaconf",
+        "opencv-python",
+        "pillow",
+        "pyglet==1.5.27",
         "pyrr",
+        "tdqm",
         "torch",
-        "trimesh",
-        # The following might be requirements for nvdiffrast
-        # (they are installed by pip in the Dockerfile),
-        # but we should check if they are really needed:
-        # "ninja",
-        # "imageio",
-        # "imageio-ffmpeg",
+        "trimesh[easy]==3.21.5",
     ],
     extras_require={
         "dev": [
-            "black",
-            "ipython",
             "pre-commit",
         ],
     },

@@ -6,6 +6,7 @@ matplotlib.use("Agg")
 
 import collections
 import io
+import sys
 import math
 import pathlib
 import random
@@ -34,8 +35,9 @@ from tqdm import tqdm
 import diffdope as dd
 
 # for better print debug
-print = ic
-
+print()
+if not hasattr(sys, 'ps1'):
+    print = ic
 
 # A logger for this file
 log = logging.getLogger(__name__)
@@ -89,7 +91,7 @@ def matrix_batch_44_from_position_quat(q, p):
 
 def opencv_2_opengl(p, q):
     """
-    Converting the pose from opencv coordinate to opengl coordinate
+    Converts a pose from the OpenCV coordinate system to the OpenGL coordinate system.
 
     Args:
         p (np.ndarray): position
@@ -233,7 +235,7 @@ def render_texture_batch(
 
 
 @torch.no_grad()
-def find_crop(img_tensor, percentage=0.3):
+def find_crop(img_tensor, percentage=0.1):
     """
     Find the bounding crop in an image, assuming it finds where there is non-zero.
 
@@ -262,7 +264,7 @@ def find_crop(img_tensor, percentage=0.3):
     right_col = min(img_tensor.shape[1] - 1, right_col + wiggle_room_cols)
 
     # Calculate the size of the square crop as the minimum of the expanded height and width
-    crop_size = min(bottom_row - top_row, right_col - left_col)
+    crop_size = max(bottom_row - top_row, right_col - left_col)
 
     return [top_row, left_col, crop_size]
 
@@ -852,10 +854,10 @@ class Mesh(torch.nn.Module):
         self._batchsize_set = False
 
     def __str__(self):
-        return f"mesh @{self.path_model}. vtx:{self.pos.shape}"
+        return f"mesh @{self.path_model}. vtx:{self.pos.shape} on {self.pos.device}"
 
     def __repr__(self):
-        return f"mesh @{self.path_model}. vtx:{self.pos.shape}"
+        return f"mesh @{self.path_model}. vtx:{self.pos.shape} on {self.pos.device}"
 
     def set_batchsize(self, batchsize):
         """
@@ -948,7 +950,7 @@ class Object3D(torch.nn.Module):
         rotation: list,
         batchsize: int = 32,
         opencv2opengl: bool = True,
-        model_path: str = "",
+        model_path: str = None,
         scale: int = 1,
     ):
         """
@@ -962,7 +964,10 @@ class Object3D(torch.nn.Module):
         super().__init__()
         self.qx = None  # to load on cpu and not gpu
 
-        self.mesh = Mesh(path_model=model_path, scale=scale)
+        if model_path is None:
+            self.mesh = None    
+        else:
+            self.mesh = Mesh(path_model=model_path, scale=scale)
 
         self.set_pose(
             position, rotation, batchsize, scale=scale, opencv2opengl=opencv2opengl
@@ -1019,7 +1024,8 @@ class Object3D(torch.nn.Module):
         self.z = torch.nn.Parameter(torch.ones(batchsize) * position[2])
 
         self.to(device)
-        self.mesh.cuda()
+        if not self.mesh is None:
+            self.mesh.cuda()
 
     def set_batchsize(self, batchsize: int):
         """
@@ -1041,8 +1047,9 @@ class Object3D(torch.nn.Module):
 
         self.to(device)
 
-        self.mesh.set_batchsize(batchsize=batchsize)
-        self.mesh.cuda()
+        if not self.mesh is None:
+            self.mesh.set_batchsize(batchsize=batchsize)
+            self.mesh.cuda()
 
     def __repr__(self):
         # TODO use the function for the argmax
@@ -1351,13 +1358,6 @@ class DiffDope:
         # todo add a cfg call here.
         # self.object3d.mesh.enable_gradients_texture()
 
-        if self.scene.tensor_rgb is not None:
-            self.gt_tensors["rgb"] = self.scene.tensor_rgb.img_tensor
-        if self.scene.tensor_depth is not None:
-            self.gt_tensors["depth"] = self.scene.tensor_depth.img_tensor
-        if self.scene.tensor_segmentation is not None:
-            self.gt_tensors["segmentation"] = self.scene.tensor_segmentation.img_tensor
-
         self.optimizer = torch.optim.SGD(
             self.object3d.parameters(), lr=self.cfg.hyperparameters.learning_rate_base
         )
@@ -1413,9 +1413,10 @@ class DiffDope:
         if self.cfg.render_images.crop_around_mask:
             if "segmentation" in self.gt_tensors.keys():
                 crop = find_crop(self.gt_tensors["segmentation"][0])
+
             else:
                 crop = find_crop(self.optimization_results[index][render_selection][0])
-
+        
         if batch_index is None:
             # make a grid
             if self.cfg.render_images.crop_around_mask:
@@ -1635,6 +1636,18 @@ class DiffDope:
 
         self.losses_values = {}
         self.optimization_results = []
+
+        self.optimizer = torch.optim.SGD(
+            self.object3d.parameters(), lr=self.cfg.hyperparameters.learning_rate_base
+        )
+
+        if self.scene.tensor_rgb is not None:
+            self.gt_tensors["rgb"] = self.scene.tensor_rgb.img_tensor
+        if self.scene.tensor_depth is not None:
+            self.gt_tensors["depth"] = self.scene.tensor_depth.img_tensor
+        if self.scene.tensor_segmentation is not None:
+            self.gt_tensors["segmentation"] = self.scene.tensor_segmentation.img_tensor
+
 
         pbar = tqdm(range(self.cfg.hyperparameters.nb_iterations + 1))
 

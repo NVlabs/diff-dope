@@ -4,11 +4,10 @@
 
 ![Diff-DOPE compared to megapose](figures/teaser.png)
 
-A 6-DoF pose refiner that takes as input an image, a 3d model, and an initial object pose. The method then outputs the pose of the object using a differentiable renderer that minimizes the object reprojection error (rgb, depth, edges, mask, etc.).
+A 6-DoF pose refiner that takes as input an image, a 3d model, and an initial object pose. The method then outputs the pose of the object using a differentiable renderer that minimizes the object reprojection error (rgb, depth, edges, mask, etc.). If you want to generate the figure above check out this [link](https://github.com/TontonTremblay/heatmap_error_pose).
 
-Code and data to be release soon (pending internal approval).
 
-## Installation
+  ## Installation
 ```bash
 conda create -n diffdope python=3.9
 conda activate diffdope

@@ -208,10 +208,21 @@ def render_texture_batch(
     depth = dd.xfm_points(gb_pos.contiguous(), mtx)
     depth = depth.reshape(shape_keep)[..., 2] * -1
 
+    # mask   , _ = dr.interpolate(torch.ones(pos_idx.shape).cuda(), rast_out, pos_idx)
+    mask, _ = dr.interpolate(torch.ones(pos_idx.shape).cuda(), 
+        rast_out, pos_idx[0],rast_db=rast_out_db,diff_attrs="all")
+    mask       = dr.antialias(mask, rast_out, pos_clip_ja, pos_idx[0])
+
     # compute vertex color interpolation
     if vtx_color is None:
         texc, texd = dr.interpolate(
             uv, rast_out, uv_idx[0], rast_db=rast_out_db, diff_attrs="all"
+        )
+        color = dr.texture(
+            tex,
+            texc,
+            texd,
+            filter_mode="linear",
         )
         color = dr.texture(
             tex,
@@ -226,7 +237,7 @@ def render_texture_batch(
         color = color * torch.clamp(rast_out[..., -1:], 0, 1)  # Mask out background.
     if not return_rast_out:
         rast_out = None
-    return {"rgb": color, "depth": depth, "rast_out": rast_out}
+    return {"rgb": color, "depth": depth, "rast_out": rast_out, 'mask':mask}
 
 
 ##############################################################################
@@ -586,10 +597,7 @@ def l1_mask(ddope):
     - lr_diff_mask_mean: The mean of the L1-on mask loss multiplied by the weight specified in the configuration.
     """
 
-    # Create the L1-on mask from the depth
-    mask = ddope.renders["rgb"] > 0
-    mask = mask.to(torch.float32)
-    # Add the mask to the optimization results
+    mask = ddope.renders["mask"]
     ddope.optimization_results[-1]["mask"] = mask.detach().cpu()
 
     # Compute the difference between the mask and ground truth segmentation

@@ -19,15 +19,15 @@ object3d:
         0.6915059982370961, -0.6037763006860087]
     model_path: data/example/mesh/AlphabetSoup.ply
 losses:
-    l1_rgb_with_mask: true
+    l1_rgb_with_mask: false
     weight_rgb: 0.7
-    l1_depth_with_mask: true
+    l1_depth_with_mask: false
     weight_depth: 1
     l1_mask: true
-    weight_mask: 2
+    weight_mask: 1
 hyperparameters:
-    nb_iterations: 20
-    batchsize: 16
+    nb_iterations: 60
+    batchsize: 8
     base_lr: 20
     learning_rates_bound: [0.01, 100]
     learning_rate_base: 1

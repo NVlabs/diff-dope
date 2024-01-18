@@ -36,7 +36,7 @@ import diffdope as dd
 
 # for better print debug
 print()
-if not hasattr(sys, 'ps1'):
+if not hasattr(sys, "ps1"):
     print = ic
 
 # A logger for this file
@@ -1267,7 +1267,7 @@ class Scene:
         Put on cuda the image tensors
         """
 
-        if not self.tensor_img is None:
+        if not self.tensor_rgb is None:
             self.tensor_rgb.cuda()
         if not self.tensor_depth is None:
             self.tensor_depth.cuda()

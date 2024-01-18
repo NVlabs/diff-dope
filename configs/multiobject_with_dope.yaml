@@ -1,0 +1,44 @@
+---
+camera:
+    fx: 908.85
+    fy: 906.69
+    cx: 626.71
+    cy: 383.20
+    im_width: 1280
+    im_height: 720
+objects:
+    - name: bbq_sauce
+      scale: 0.01
+      pose_topic: /dope/pose_BBQSauce
+      model_path: data/example/mesh/textured.obj
+    - name: orange_juice
+      scale: 0.01
+      pose_topic: /dope/pose_OrangeJuice
+      model_path: data/example/mesh/textured.obj
+    - name: mustard
+      scale: 0.01
+      pose_topic: /dope/pose_Mustard
+      model_path: data/example/mesh/textured.obj
+losses:
+    l1_rgb_with_mask: false
+    weight_rgb: 0.7
+    l1_depth_with_mask: false
+    weight_depth: 1
+    l1_mask: true
+    weight_mask: 1
+hyperparameters:
+    nb_iterations: 60
+    batchsize: 8
+    base_lr: 20
+    learning_rates_bound: [0.01, 100]
+    learning_rate_base: 1
+    lr_decay: 0.1
+render_images:
+    nrow: 4
+    final_width_batch: 2000
+    add_background: true
+    alpha_overlay: 0.7
+    add_countour: true
+    color_countour: [0.46, 0.73, 0]
+    flip_result: true
+    crop_around_mask: true

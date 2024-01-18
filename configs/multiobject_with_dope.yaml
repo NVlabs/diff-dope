@@ -6,19 +6,21 @@ camera:
     cy: 383.20
     im_width: 1280
     im_height: 720
+    rgb_topic: /camera/color/image_raw
+    depth_topic: /camera/depth/image_rect_raw
 objects:
     - name: bbq_sauce
       scale: 0.01
       pose_topic: /dope/pose_BBQSauce
-      model_path: data/example/mesh/textured.obj
+      model_path: data/example/mesh/hope/bbq_sauce.obj
     - name: orange_juice
       scale: 0.01
       pose_topic: /dope/pose_OrangeJuice
-      model_path: data/example/mesh/textured.obj
+      model_path: data/example/mesh/hope/orange_juice.obj
     - name: mustard
       scale: 0.01
       pose_topic: /dope/pose_Mustard
-      model_path: data/example/mesh/textured.obj
+      model_path: data/example/mesh/hope/mustard.obj
 losses:
     l1_rgb_with_mask: false
     weight_rgb: 0.7

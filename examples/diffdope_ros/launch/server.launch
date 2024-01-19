@@ -1,0 +1,12 @@
+<launch>
+    <arg name="config_file_name" 
+         default="multiobject_with_dope"
+    />
+
+    <node name="diffdope_actionlib_server" 
+          pkg="diffdope_ros" 
+          type="server.py" 
+          output="screen" 
+          args="$(arg config_file_name)" 
+    />
+</launch>

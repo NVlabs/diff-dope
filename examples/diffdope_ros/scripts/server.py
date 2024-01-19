@@ -1,16 +1,22 @@
 import os
 import sys
-import rospkg
+
+import actionlib
 import hydra
+import rospkg
 import rospy
 import torch
+from diffdope_ros.msg import (
+    ObjectDetails,
+    RefineAllAction,
+    RefineAllActionResult,
+    RefineObjectAction,
+    RefineObjectActionResult,
+    TargetObject,
+)
 from icecream import ic
 from omegaconf import DictConfig
-import actionlib
-from diffdope_ros.msg import RefineAllAction, RefineAllActionResult
-from diffdope_ros.msg import RefineObjectAction, RefineObjectActionResult
-from diffdope_ros.msg import ObjectDetails
-from diffdope_ros.msg import TargetObject
+
 import diffdope as dd
 
 
@@ -19,20 +25,21 @@ class DiffDOPEServer:
         self.cfg = cfg
 
         self._action_refine_object_server = actionlib.SimpleActionServer(
-            'refine_object', 
-            RefineObjectAction, 
-            execute_cb=self.refine_object, 
-            auto_start=False)
+            "refine_object",
+            RefineObjectAction,
+            execute_cb=self.refine_object,
+            auto_start=False,
+        )
 
         self._action_refine_all_server = actionlib.SimpleActionServer(
-            'refine_all', 
-            RefineAllAction, 
-            execute_cb=self.refine_all, 
-            auto_start=False)
+            "refine_all", RefineAllAction, execute_cb=self.refine_all, auto_start=False
+        )
 
         self._action_refine_object_server.start()
         self._action_refine_all_server.start()
-        rospy.loginfo('[DiffDOPE Server] Both action servers started. Waiting for requests...')
+        rospy.loginfo(
+            "[DiffDOPE Server] Both action servers started. Waiting for requests..."
+        )
 
     def refine_object(self, target_object: TargetObject):
         result = self._compute_refined_pose(target_object, RefineObjectActionResult())
@@ -40,7 +47,9 @@ class DiffDOPEServer:
 
     def refine_all(self, target_objects):
         for target_object in target_objects:
-            result = self._compute_refined_pose(target_object, RefineObjectActionResult())
+            result = self._compute_refined_pose(
+                target_object, RefineObjectActionResult()
+            )
             self._action_refine_all_server.set_succeeded(result)
 
     def _create_pose_stamped(self, diffdope_pose):
@@ -86,7 +95,7 @@ class DiffDOPEServer:
 
 
 def parse_cfg():
-    diffdope_ros_path = rospkg.RosPack().get_path('diffdope_ros')
+    diffdope_ros_path = rospkg.RosPack().get_path("diffdope_ros")
     config_dir = os.path.join(diffdope_ros_path, "configs")
     config_file = sys.argv[1]
 
@@ -97,7 +106,7 @@ def parse_cfg():
 
 
 if __name__ == "__main__":
-    rospy.init_node('diffdope_action_server')
+    rospy.init_node("diffdope_action_server")
 
     if len(sys.argv) > 1:
         config_file = sys.argv[1]

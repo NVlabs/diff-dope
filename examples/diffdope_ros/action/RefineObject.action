@@ -1,0 +1,8 @@
+# Request
+diffdope_ros/ObjectDetails object_details
+---
+# Result
+diffdope_ros/RefinedEstimation refined_estimation
+---
+# Feedback
+bool finished

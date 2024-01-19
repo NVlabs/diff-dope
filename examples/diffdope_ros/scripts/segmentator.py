@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import rospkg
 import torch
-from segment_anything import SamAutomaticMaskGenerator, SamPredictor, sam_model_registry
+from segment_anything import SamPredictor, sam_model_registry
 
 
 class SegmentAnything:

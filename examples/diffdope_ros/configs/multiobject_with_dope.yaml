@@ -6,6 +6,8 @@ camera:
     cy: 383.20
     im_width: 1280
     im_height: 720
+segment_anything_checkpoint_path: ~/sam_vit_b_01ec64.pth
+image_resize: 0.5
 topics:
     rgb: /camera/color/image_raw
     depth: /camera/depth/image_rect_raw

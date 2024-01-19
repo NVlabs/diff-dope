@@ -1,13 +1,16 @@
 import os
 import sys
 
+import rospkg
+
+diffdope_ros_path = rospkg.RosPack().get_path("diffdope_ros")
+sys.path.insert(0, os.path.join(diffdope_ros_path, "scripts"))
+
 import actionlib
 import hydra
-import rospkg
 import rospy
 import torch
 from diffdope_ros.msg import (
-    ObjectDetails,
     RefineAllAction,
     RefineAllActionResult,
     RefineObjectAction,
@@ -16,6 +19,7 @@ from diffdope_ros.msg import (
 )
 from icecream import ic
 from omegaconf import DictConfig
+from segmentator import SegmentAnything
 
 import diffdope as dd
 
@@ -23,6 +27,8 @@ import diffdope as dd
 class DiffDOPEServer:
     def __init__(self, cfg: DictConfig):
         self.cfg = cfg
+        checkpoint_path = os.path.expanduser(self.cfg.segment_anything_checkpoint_path)
+        self.segment_anything = SegmentAnything(self.cfg.camera, checkpoint_path)
 
         self._action_refine_object_server = actionlib.SimpleActionServer(
             "refine_object",
@@ -41,8 +47,10 @@ class DiffDOPEServer:
             "[DiffDOPE Server] Both action servers started. Waiting for requests..."
         )
 
-    def refine_object(self, target_object: TargetObject):
-        result = self._compute_refined_pose(target_object, RefineObjectActionResult())
+    def refine_object(self, goal):
+        result = self._compute_refined_pose(
+            goal.target_object, RefineObjectActionResult()
+        )
         self._action_refine_object_server.set_succeeded(result)
 
     def refine_all(self, target_objects):
@@ -55,8 +63,13 @@ class DiffDOPEServer:
     def _create_pose_stamped(self, diffdope_pose):
         return PoseStamped()
 
-    def _compute_refined_pose(self, target_object: TargetObject, result):
-        scene = self._generate_scene(target_object.rgb_frame, target_object.depth_frame)
+    def _compute_refined_pose(self, target_object, result):
+        initial_pose_estimate = target_object.pose.pose
+        scene = self._generate_scene(
+            target_object.rgb_frame,
+            target_object.depth_frame,
+            initial_pose_estimate.position,
+        )
         object3d = self._generate_3d_object(target_object)
 
         ddope = dd.DiffDope(cfg=self.cfg, scene=scene, object3d=object3d)
@@ -70,17 +83,30 @@ class DiffDOPEServer:
 
         return result
 
-    def _generate_scene(self, rgb_frame, depth_frame):
+    def _generate_scene(self, rgb_frame, depth_frame, point_in_camera):
         rgb_tensor = torch.tensor(rgb_frame).float()
-        rgb_image = dd.Image(img_tensor=rgb_tensor)
+        rgb_image = dd.Image(img_tensor=rgb_tensor, img_resize=self.cfg.image_resize)
 
         depth_tensor = torch.tensor(depth_frame).float()
-        depth_image = dd.Image(img_tensor=depth_tensor, depth=True)
+        depth_image = dd.Image(
+            img_tensor=depth_tensor, img_resize=self.cfg.image_resize, depth=True
+        )
 
-        scene = dd.Scene(tensor_rgb=rgb_image, tensor_depth=depth_image)
+        segmentation_frame = self.segment_anything.segment(rgb_frame, point_in_camera)
+        segmentation_tensor = torch.tensor(segmentation_frame).float()
+        segmentation_image = dd.Image(
+            img_tensor=segmentation_tensor, img_resize=self.cfg.image_resize
+        )
+
+        scene = dd.Scene(
+            tensor_rgb=rgb_image,
+            tensor_depth=depth_image,
+            tensor_segmentation=segmentation_image,
+        )
+
         return scene
 
-    def _generate_3d_object(self, goal: ObjectDetails):
+    def _generate_3d_object(self, goal: TargetObject):
         pos = goal.pose.position
         position = [pos.x, pos.y, pos.z]
 

@@ -1,0 +1,12 @@
+<launch>
+    <arg name="config_file_name"
+         default="multiobject_with_dope"
+    />
+
+    <node name="diffdope_refiner"
+          pkg="diffdope_ros"
+          type="refine.py"
+          output="screen"
+          args="$(arg config_file_name)"
+    />
+</launch>

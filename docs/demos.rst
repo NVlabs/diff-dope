@@ -7,10 +7,10 @@ Multi-object using ROS and DOPE with RGB and Depth
 The demo uses RGB and Depth from a RealSense camera, poses published by DOPE,
 and segments the image using
 [segment-anything](https://github.com/facebookresearch/segment-anything). The
-demo comes as a catkin package under `examples/`.
+demo comes as a catkin package under ``examples/``.
 
-Say you cloned the diff-dope repo under your home directory (i.e., `~/diff-dope`),
-and you have a catkin workspace under your home directory too (i.e., `~/catkin_ws`),
+Say you cloned the diff-dope repo under your home directory (i.e., ``~/diff-dope``),
+and you have a catkin workspace under your home directory too (i.e., ``~/catkin_ws``),
 you can create a symlink of the package there:
 
 .. code::
@@ -18,11 +18,11 @@ you can create a symlink of the package there:
     cd ~/catkin_ws/src
     ln -s ~/diff-dope/examples/diffdope_ros .
 
-You can `catkin_make` under `~/catkin_ws` now to build the package.
+You can ``catkin_make`` under ``~/catkin_ws`` now to build the package.
 You can, of course, move the package there instead of creating a symlink.
 
 The demo uses a configuration under
-`diffdope_ros/config/multiobject_with_dope.yaml` which uses DOPE for initial
+``diffdope_ros/config/multiobject_with_dope.yaml`` which uses DOPE for initial
 pose estimation, and dictates topics for RGB and Depth (assuming a RealSense
 sensor).
 
@@ -45,6 +45,8 @@ You need to install [segment-anything](https://github.com/facebookresearch/segme
 and download the weights of the model. For installation and where to download
 the weights, please refer to the README file of segment-anything.
 TODO explain where to put the weight.
+If you want to test the segmentation functionality, you can run the following
+Python script: ``diffdope_ros/scripts/segmentator.py``.
 
 From there you can run the demo like so:
 

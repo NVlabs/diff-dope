@@ -6,6 +6,8 @@ import rospkg
 diffdope_ros_path = rospkg.RosPack().get_path("diffdope_ros")
 sys.path.insert(0, os.path.join(diffdope_ros_path, "scripts"))
 
+from collections import namedtuple
+
 import actionlib
 import cv2
 import hydra
@@ -22,6 +24,7 @@ from diffdope_ros.msg import (
 from icecream import ic
 from omegaconf import DictConfig
 from segmentator import SegmentAnything
+from sensor_msgs.msg import CameraInfo
 
 import diffdope as dd
 
@@ -29,8 +32,12 @@ import diffdope as dd
 class DiffDOPEServer:
     def __init__(self, cfg: DictConfig):
         self.cfg = cfg
+        self.camera_parameters = self.get_camera_intrinsic_params(
+            self.cfg.topics.camera_info
+        )
+
         checkpoint_path = os.path.expanduser(self.cfg.segment_anything_checkpoint_path)
-        self.segment_anything = SegmentAnything(self.cfg.camera, checkpoint_path)
+        self.segment_anything = SegmentAnything(self.camera_parameters, checkpoint_path)
 
         self._action_refine_object_server = actionlib.SimpleActionServer(
             "refine_object",
@@ -48,6 +55,30 @@ class DiffDOPEServer:
         rospy.loginfo(
             "[DiffDOPE Server] Both action servers started. Waiting for requests..."
         )
+
+    def get_camera_intrinsic_params(self, camera_info_topic_name):
+        camera_info = None
+
+        def camera_info_callback(data):
+            nonlocal camera_info
+            camera_info = data
+
+        rospy.Subscriber(camera_info_topic_name, CameraInfo, camera_info_callback)
+
+        while camera_info is None and not rospy.is_shutdown():
+            rospy.sleep(0.1)
+
+        fx = camera_info.K[0]  # Focal length in x-axis
+        fy = camera_info.K[4]  # Focal length in y-axis
+        cx = camera_info.K[2]  # Principal point in x-axis
+        cy = camera_info.K[5]  # Principal point in y-axis
+
+        image_height = camera_info.height
+        image_width = camera_info.width
+
+        Camera = namedtuple("Camera", "fx fy cx cy image_height image_width")
+        camera_intrinsic_parameters = Camera(fx, fy, cx, cy, image_height, image_width)
+        return camera_intrinsic_parameters
 
     def refine_object(self, goal):
         result = self._compute_refined_pose(

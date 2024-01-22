@@ -19,8 +19,8 @@ class SegmentAnything:
         self.mask_predictor = SamPredictor(self.sam)
 
     def _project_position_to_image_plane(self, position):
-        x = position[0] / position[2]
-        y = position[1] / position[2]
+        x = position.x / position.z
+        y = position.y / position.z
 
         new_x = self.camera_parameters.fx * x + self.camera_parameters.cx
         new_y = self.camera_parameters.fy * y + self.camera_parameters.cy
@@ -40,7 +40,7 @@ class SegmentAnything:
 
         largest_mask = max(masks, key=np.count_nonzero)
 
-        return largest_mask
+        return largest_mask * 255
 
 
 def dummy_demo():
@@ -71,7 +71,7 @@ def dummy_demo():
         segmentation_mask = sa.segment(image_bgr, dope_position)
 
         path = os.path.join(output_dir, f"output{i}.png")
-        cv2.imwrite(path, segmentation_mask * 255)
+        cv2.imwrite(path, segmentation_mask)
         print(f"Output segmentation saved at {path}")
         print()
 

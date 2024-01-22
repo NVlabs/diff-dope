@@ -9,7 +9,6 @@ import cv2
 import hydra
 import rospkg
 import rospy
-from cv_bridge import CvBridge
 from diffdope_ros.msg import RefineObjectAction, RefineObjectGoal, TargetObject
 from geometry_msgs.msg import PoseStamped
 from omegaconf import DictConfig
@@ -130,6 +129,7 @@ def main_single_object(cfg: DictConfig, object_name):
     target_object.rgb_frame = rgb_frame
     target_object.depth_frame = depth_frame
     target_object.model_path = obj_cfg.model_path
+    target_object.scale = obj_cfg.scale
     goal.target_object = target_object
 
     client.send_goal(goal)

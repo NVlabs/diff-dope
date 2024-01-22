@@ -6,8 +6,8 @@ Multi-object using ROS and DOPE with RGB and Depth
 
 The demo uses RGB and Depth from a RealSense camera, poses published by DOPE,
 and segments the image using
-[segment-anything](https://github.com/facebookresearch/segment-anything). The
-demo comes as a catkin package under ``examples/``.
+`segment-anything <https://github.com/facebookresearch/segment-anything>`_.
+The demo comes as a catkin package under ``examples/``.
 
 Say you cloned the diff-dope repo under your home directory (i.e., ``~/diff-dope``),
 and you have a catkin workspace under your home directory too (i.e., ``~/catkin_ws``),
@@ -41,12 +41,22 @@ If you wish to use the ROS bag, you can play it back in a loop like so:
     rosbag play -l ~/path/to/cluttered_hope_scene_with_dope_detections.bag
 
 
-You need to install [segment-anything](https://github.com/facebookresearch/segment-anything)
-and download the weights of the model. For installation and where to download
-the weights, please refer to the README file of segment-anything.
-TODO explain where to put the weight.
-If you want to test the segmentation functionality, you can run the following
-Python script: ``diffdope_ros/scripts/segmentator.py``.
+You need to install
+`segment-anything <https://github.com/facebookresearch/segment-anything>`_
+and download the weights of the model.
+
+.. code::
+
+    pip install git+https://github.com/facebookresearch/segment-anything.git
+
+
+Then head to the
+`model checkpoints section <https://github.com/facebookresearch/segment-anything?tab=readme-ov-file#model-checkpoints>`_,
+and download any of the model checkpoints. Place it somewhere on your
+computer and update the ``segment_anything_checkpoint_path`` of the config file
+to let it know where to find it. If you want to test the segmentation
+functionality independently, you can run the following Python script:
+``diffdope_ros/scripts/segmentator.py``.
 
 From there you can run the demo like so:
 
@@ -55,10 +65,11 @@ From there you can run the demo like so:
     rosrun diffdope_ros server.py # To start the actionlib server
 
     # Refine pose for individual object
-    rosrun diffdope_ros refine.py object_name:=some_object_name1
-    rosrun diffdope_ros refine.py object_name:=some_object_name2
+    rosrun diffdope_ros refine.py object_name:=bbq_sauce
+    rosrun diffdope_ros refine.py object_name:=orange_juice
+    rosrun diffdope_ros refine.py object_name:=mustard
 
-    # Refine pose for all objects
+    # or don't pass object_name to refine the pose of all the objects in the config
     rosrun diffdope_ros refine.py
 
 The possible object names for this demo are: ``bbq_sauce, orange_juice, mustard``

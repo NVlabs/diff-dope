@@ -9,7 +9,13 @@ import cv2
 import hydra
 import rospkg
 import rospy
-from diffdope_ros.msg import RefineObjectAction, RefineObjectGoal, TargetObject
+from diffdope_ros.msg import (
+    RefineAllAction,
+    RefineAllGoal,
+    RefineObjectAction,
+    RefineObjectGoal,
+    TargetObject,
+)
 from geometry_msgs.msg import PoseStamped
 from omegaconf import DictConfig
 from sensor_msgs.msg import Image as ROS_Image
@@ -23,36 +29,11 @@ def pose_callback(pose_stamped_msg, object_name):
 def rgb_callback(img_msg, object_name):
     with rgb_lock:
         live_rgb_per_object[object_name] = img_msg
-    # bridge = CvBridge()
-    # with rgb_lock:
-    #     try:
-    #         cv_image = bridge.imgmsg_to_cv2(img_msg, "bgr8")
-    #         rgb_frame = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
-    #         rgb_frame_normalized = rgb_frame / 255.0
-    #         flipped_rgb_frame_normalized = cv2.flip(
-    #             rgb_frame_normalized, 0
-    #         )  # needed by diff-dope
-    #         live_rgb_per_object[object_name] = flipped_rgb_frame_normalized
-    #     except Exception as e:
-    #         rospy.logerr(f"CvBridge Error: {e}")
 
 
 def depth_callback(depth_msg, object_name):
     with depth_lock:
         live_depth_per_object[object_name] = depth_msg
-
-    # bridge = CvBridge()
-    # depth_scale = 100
-
-    # with depth_lock:
-    #     try:
-    #         cv_image_depth = (
-    #             bridge.imgmsg_to_cv2(depth_msg, "passthrough") / depth_scale
-    #         )
-    #         depth_frame = cv2.flip(cv_image_depth, 0)  # needed by diff-dope
-    #         live_depth_per_object[object_name] = depth_frame
-    #     except Exception as e:
-    #         rospy.logerr(f"CvBridge Error: {e}")
 
 
 def init_ros_subscribers(cfg):
@@ -93,20 +74,13 @@ def get_initialisation_for(object_name):
     dope_pose, rgb_frame, depth_frame = None, None, None
 
     # Prevent data race by using a lock
-    with pose_lock, rgb_lock, depth_lock:
-        dope_pose = live_dope_pose_per_object[object_name]
-        rgb_frame = live_rgb_per_object[object_name]
-        depth_frame = live_depth_per_object[object_name]
+    while dope_pose is None or rgb_frame is None or depth_frame is None:
+        with pose_lock, rgb_lock, depth_lock:
+            dope_pose = live_dope_pose_per_object[object_name]
+            rgb_frame = live_rgb_per_object[object_name]
+            depth_frame = live_depth_per_object[object_name]
 
     return dope_pose, rgb_frame, depth_frame
-
-
-def main_all_objects(cfg: DictConfig):
-    for obj_cfg in cfg.objects:
-        init_pose, rgb_frame, depth_frame = get_initialisation_for(obj_cfg.name)
-        refined_pose = get_refined_pose_using_diff_dope(cfg, scene, object3d)
-        print(f"The initial pose for {obj_cfg.name} was {init_pose}")
-        print(f"The refined pose for {obj_cfg.name} is {refined_pose}")
 
 
 def get_object_definition_by_name(cfg, object_name):
@@ -135,8 +109,34 @@ def main_single_object(cfg: DictConfig, object_name):
     client.send_goal(goal)
     client.wait_for_result()
 
-    refined_pose = client.get_result()
-    print(refined_pose)
+    result = client.get_result()
+    print(result.refined_estimation.pose)
+
+
+def main_all_objects(cfg: DictConfig):
+    client = actionlib.SimpleActionClient("refine_all", RefineAllAction)
+    client.wait_for_server()
+
+    goal = RefineAllGoal()
+    for obj_cfg in cfg.objects:
+        init_pose, rgb_frame, depth_frame = get_initialisation_for(obj_cfg.name)
+        target_object = TargetObject()
+        target_object.name = obj_cfg.name
+        target_object.pose = init_pose
+        target_object.rgb_frame = rgb_frame
+        target_object.depth_frame = depth_frame
+        target_object.model_path = obj_cfg.model_path
+        target_object.scale = obj_cfg.scale
+        goal.target_objects.append(target_object)
+
+    client.send_goal(goal)
+    client.wait_for_result()
+
+    result = client.get_result()
+    for refined_estimation in result.refined_estimations:
+        print(refined_estimation.name)
+        print(refined_estimation.pose)
+        print()
 
 
 def parse_cfg():
@@ -148,6 +148,12 @@ def parse_cfg():
     cfg = hydra.compose(config_name=config_file, return_hydra_config=True)
 
     return cfg
+
+
+def is_object_name_in_cfg(cfg, object_name):
+    for obj_cfg in cfg.objects:
+        if obj_cfg.name == object_name:
+            return True
 
 
 if __name__ == "__main__":
@@ -163,4 +169,13 @@ if __name__ == "__main__":
 
     cfg = parse_cfg()
     init_ros_subscribers(cfg)
-    main_single_object(cfg, "bbq_sauce")
+
+    object_name = sys.argv[2]
+    if object_name == "all":
+        rospy.loginfo("Refining all objects...")
+        main_all_objects(cfg)
+    else:
+        rospy.loginfo(f"Refining {object_name} only...")
+        if not is_object_name_in_cfg(cfg, object_name):
+            sys.exit("The object name provided is not in the config file.")
+        main_single_object(cfg, object_name)

@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 
 import rospkg
@@ -12,17 +13,18 @@ import actionlib
 import cv2
 import hydra
 import rospy
+import tf.transformations as tf_trans
 import torch
 from cv_bridge import CvBridge
 from diffdope_ros.msg import (
     RefineAllAction,
-    RefineAllActionResult,
+    RefineAllResult,
     RefineObjectAction,
-    RefineObjectActionResult,
+    RefineObjectResult,
     TargetObject,
 )
-from icecream import ic
-from omegaconf import DictConfig
+from geometry_msgs.msg import PoseStamped
+from omegaconf import DictConfig, OmegaConf, open_dict
 from segmentator import SegmentAnything
 from sensor_msgs.msg import CameraInfo
 
@@ -32,22 +34,30 @@ import diffdope as dd
 class DiffDOPEServer:
     def __init__(self, cfg: DictConfig):
         self.cfg = cfg
-        self.camera_parameters = self.get_camera_intrinsic_params(
+        self.camera_parameters = self.__get_camera_intrinsic_params(
             self.cfg.topics.camera_info
         )
 
+        # diff-dope internally needs the camera parameters in self.cfg
+        self.__add_camera_parameters_to_cfg()
+
         checkpoint_path = os.path.expanduser(self.cfg.segment_anything_checkpoint_path)
         self.segment_anything = SegmentAnything(self.camera_parameters, checkpoint_path)
+        self.__advertise_actions()
 
+    def __advertise_actions(self):
         self._action_refine_object_server = actionlib.SimpleActionServer(
             "refine_object",
             RefineObjectAction,
-            execute_cb=self.refine_object,
+            execute_cb=self.__refine_object,
             auto_start=False,
         )
 
         self._action_refine_all_server = actionlib.SimpleActionServer(
-            "refine_all", RefineAllAction, execute_cb=self.refine_all, auto_start=False
+            "refine_all",
+            RefineAllAction,
+            execute_cb=self.__refine_all,
+            auto_start=False,
         )
 
         self._action_refine_object_server.start()
@@ -56,7 +66,18 @@ class DiffDOPEServer:
             "[DiffDOPE Server] Both action servers started. Waiting for requests..."
         )
 
-    def get_camera_intrinsic_params(self, camera_info_topic_name):
+    def __add_camera_parameters_to_cfg(self):
+        OmegaConf.set_struct(self.cfg, True)
+        with open_dict(self.cfg):
+            self.cfg.camera = {}
+            self.cfg.camera.fx = self.camera_parameters.fx
+            self.cfg.camera.fy = self.camera_parameters.fy
+            self.cfg.camera.cx = self.camera_parameters.cx
+            self.cfg.camera.cy = self.camera_parameters.cy
+            self.cfg.camera.im_width = self.camera_parameters.image_width
+            self.cfg.camera.im_height = self.camera_parameters.image_height
+
+    def __get_camera_intrinsic_params(self, camera_info_topic_name):
         camera_info = None
 
         def camera_info_callback(data):
@@ -80,106 +101,189 @@ class DiffDOPEServer:
         camera_intrinsic_parameters = Camera(fx, fy, cx, cy, image_height, image_width)
         return camera_intrinsic_parameters
 
-    def refine_object(self, goal):
-        result = self._compute_refined_pose(
-            goal.target_object, RefineObjectActionResult()
-        )
+    def __refine_object(self, goal):
+        refined_pose = self.__compute_refined_pose(goal.target_object)
+        result = RefineObjectResult()
+        result.refined_estimation = refined_pose
         self._action_refine_object_server.set_succeeded(result)
 
-    def refine_all(self, target_objects):
-        for target_object in target_objects:
-            result = self._compute_refined_pose(
-                target_object, RefineObjectActionResult()
-            )
-            self._action_refine_all_server.set_succeeded(result)
+    def __refine_all(self, goal):
+        result = RefineAllResult()
+        for target_object in goal.target_objects:
+            refined_pose = self.__compute_refined_pose(target_object)
+            result.refined_estimations.append(refined_pose)
+        self._action_refine_all_server.set_succeeded(result)
 
-    def _create_pose_stamped(self, diffdope_pose):
-        return None
-
-    def _compute_refined_pose(self, target_object, result):
+    def __compute_refined_pose(self, target_object):
         initial_pose_estimate = target_object.pose.pose
-        scene = self._generate_scene(
+
+        scene = self.__generate_scene(
             target_object.rgb_frame,
             target_object.depth_frame,
             initial_pose_estimate.position,
         )
-        object3d = self._generate_3d_object(target_object)
+        object3d = self.__generate_3d_object(target_object)
 
         ddope = dd.DiffDope(cfg=self.cfg, scene=scene, object3d=object3d)
         ddope.run_optimization()
-        print(ddope.get_pose())
-        ddope.make_animation(output_file_path=os.path.expanduser("~/simple_scene.mp4"))
 
-        refined_pose = self._create_pose_stamped(ddope.get_pose())
+        if self.cfg.save_video:
+            self.__save_video(ddope)
+
+        refined_pose = self.__create_pose_stamped(ddope.get_pose())
         target_object = TargetObject()
         target_object.name = target_object.name
         target_object.pose = refined_pose
-        # result.refined_estimation = target_object
 
-        return result
+        return target_object
 
-    def _generate_scene(self, rgb_frame, depth_frame, point_in_camera):
-        bridge = CvBridge()
+    def __save_video(self, ddope):
+        video_dir = os.path.expanduser(self.cfg.saved_videos_path)
+        self.__create_dir_if_not_exists(video_dir)
+        next_video_id = self.__find_next_available_video_id(video_dir)
+        video_path = os.path.join(video_dir, f"video_{next_video_id}.mp4")
+        ddope.make_animation(output_file_path=video_path)
+        rospy.loginfo(f"Video saved at {video_path}")
+
+    def __create_pose_stamped(self, diffdope_transform):
+        translation = diffdope_transform[0:3, 3]
+        quaternion = tf_trans.quaternion_from_matrix(diffdope_transform)
+
+        pose_stamped = PoseStamped()
+        pose_stamped.header.stamp = rospy.Time.now()
+        pose_stamped.header.frame_id = "frame_id"
+
+        pose_stamped.pose.position.x = translation[0]
+        pose_stamped.pose.position.y = translation[1]
+        pose_stamped.pose.position.z = translation[2]
+
+        pose_stamped.pose.orientation.x = quaternion[0]
+        pose_stamped.pose.orientation.y = quaternion[1]
+        pose_stamped.pose.orientation.z = quaternion[2]
+        pose_stamped.pose.orientation.w = quaternion[3]
+
+        return pose_stamped
+
+    def __create_dir_if_not_exists(self, dir):
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+
+    def __find_next_available_video_id(self, directory):
+        max_id = 0
+        pattern = r"video_(\d+)\.mp4"
+
+        for filename in os.listdir(directory):
+            if filename.endswith(".mp4"):
+                match = re.search(pattern, filename)
+                if match:
+                    file_id = int(match.group(1))
+                    max_id = max(max_id, file_id)
+
+        return max_id + 1
+
+    def __resize_image(self, image, is_depth=False):
+        if self.cfg.image_resize < 1.0:
+            if is_depth:
+                image = cv2.resize(
+                    image,
+                    (
+                        int(image.shape[1] * self.cfg.image_resize),
+                        int(image.shape[0] * self.cfg.image_resize),
+                    ),
+                    interpolation=cv2.INTER_NEAREST,
+                )
+            else:
+                image = cv2.resize(
+                    image,
+                    (
+                        int(image.shape[1] * self.cfg.image_resize),
+                        int(image.shape[0] * self.cfg.image_resize),
+                    ),
+                )
+
+        return image
+
+    def __convert_rgb_frame_to_diffdope_image(self, cv_bridge, rgb_frame):
         try:
-            cv_image = bridge.imgmsg_to_cv2(rgb_frame, "bgr8")
+            cv_image = cv_bridge.imgmsg_to_cv2(rgb_frame, "bgr8")
             rgb_frame = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
-            output_path = (
-                "/home/rafael/debug"  # os.path.join(diffdope_ros_path, 'debug')
-            )
-            cv2.imwrite(os.path.join(output_path, "rgb1.png"), cv_image)
-            cv2.imwrite(os.path.join(output_path, "rgb2.png"), rgb_frame)
-
-            segmentation_frame = self.segment_anything.segment(
-                rgb_frame, point_in_camera
-            )
-
             rgb_frame_normalized = rgb_frame / 255.0
             rgb_frame = cv2.flip(rgb_frame_normalized, 0)  # needed by diff-dope
-            cv2.imwrite(os.path.join(output_path, "rgb3.png"), rgb_frame)
         except Exception as e:
             rospy.logerr(f"CvBridge Error: {e}")
 
+        rgb_frame = self.__resize_image(rgb_frame)
+        rgb_tensor = torch.tensor(rgb_frame).float()
+        rgb_image = dd.Image(img_tensor=rgb_tensor, img_resize=self.cfg.image_resize)
+        return rgb_image
+
+    def __convert_depth_frame_to_diffdope_image(self, cv_bridge, depth_frame):
         depth_scale = 100
         try:
-            depth_frame = bridge.imgmsg_to_cv2(depth_frame, "passthrough") / depth_scale
+            depth_frame = (
+                cv_bridge.imgmsg_to_cv2(depth_frame, "passthrough") / depth_scale
+            )
             depth_frame = cv2.flip(depth_frame, 0)  # needed by diff-dope
         except Exception as e:
             rospy.logerr(f"CvBridge Error: {e}")
 
-        rgb_tensor = torch.tensor(rgb_frame).float()
-        rgb_image = dd.Image(img_tensor=rgb_tensor, img_resize=self.cfg.image_resize)
-
+        depth_frame = self.__resize_image(depth_frame, is_depth=True)
         depth_tensor = torch.tensor(depth_frame).float()
         depth_image = dd.Image(
             img_tensor=depth_tensor, img_resize=self.cfg.image_resize, depth=True
         )
 
-        # segmentation_frame = segmentation_frame / 255.0
-        # segmentation_frame = cv2.flip(
-        # segmentation_frame, 0
-        # )  # needed by diff-dope
+        return depth_image
 
-        output_path = "/home/rafael/debug"  # os.path.join(diffdope_ros_path, 'debug')
-        cv2.imwrite(os.path.join(output_path, "rgb.png"), rgb_frame)
-        # cv2.imwrite(os.path.join(output_path, 'depth.png'), depth_frame)
-        cv2.imwrite(os.path.join(output_path, "seg.png"), segmentation_frame)
-        # segmentation_tensor = torch.tensor(segmentation_frame).float()
+    def __convert_segmentation_frame_to_diffdope_image(
+        self, cv_bridge, rgb_frame, point_in_camera
+    ):
+        try:
+            cv_image = cv_bridge.imgmsg_to_cv2(rgb_frame, "bgr8")
+            rgb_frame = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
 
-        # segmentation_image = dd.Image(
-        #     img_tensor=segmentation_tensor, img_resize=self.cfg.image_resize
-        # )
+            segmentation_frame = self.segment_anything.segment(
+                rgb_frame, point_in_camera
+            )
+        except Exception as e:
+            rospy.logerr(f"CvBridge Error: {e}")
+
+        # Make segmentation a 3 channel RGB image.
+        segmentation_frame = cv2.merge(
+            (segmentation_frame, segmentation_frame, segmentation_frame)
+        )
+        segmentation_frame = segmentation_frame / 255.0
+        segmentation_frame = cv2.flip(segmentation_frame, 0)  # needed by diff-dope
+
+        segmentation_frame = self.__resize_image(segmentation_frame)
+        segmentation_tensor = torch.tensor(segmentation_frame).float()
+
+        segmentation_image = dd.Image(
+            img_tensor=segmentation_tensor, img_resize=self.cfg.image_resize
+        )
+
+        return segmentation_image
+
+    def __generate_scene(self, rgb_frame, depth_frame, point_in_camera):
+        cv_bridge = CvBridge()
+        rgb_image = self.__convert_rgb_frame_to_diffdope_image(cv_bridge, rgb_frame)
+        depth_image = self.__convert_depth_frame_to_diffdope_image(
+            cv_bridge, depth_frame
+        )
+        segmentation_image = self.__convert_segmentation_frame_to_diffdope_image(
+            cv_bridge, rgb_frame, point_in_camera
+        )
 
         scene = dd.Scene(
             tensor_rgb=rgb_image,
             tensor_depth=depth_image,
-            path_segmentation=output_path + "/seg.png",
-            image_resize=1.0
-            # tensor_segmentation=segmentation_image,
+            tensor_segmentation=segmentation_image,
+            image_resize=self.cfg.image_resize,
         )
 
         return scene
 
-    def _generate_3d_object(self, goal: TargetObject):
+    def __generate_3d_object(self, goal: TargetObject):
         pos = goal.pose.pose.position
         position = [pos.x * 1_000, pos.y * 1_000, pos.z * 1_000]
 
@@ -188,7 +292,7 @@ class DiffDOPEServer:
 
         model_path = os.path.join(diffdope_ros_path, goal.model_path)
         object3d = dd.Object3D(
-            position, rotation, model_path=model_path  # , scale=goal.scale
+            position, rotation, model_path=model_path, scale=goal.scale
         )
 
         return object3d

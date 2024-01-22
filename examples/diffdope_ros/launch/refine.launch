@@ -1,4 +1,11 @@
 <launch>
+    <!--
+    Provide an object name to track a specific object,
+    or 'all' to track every object in the config
+    file. You can pass an argument when you invoke roslaunch.
+    -->
+    <arg name="object_name" default="all"/>
+
     <arg name="config_file_name"
          default="multiobject_with_dope"
     />
@@ -7,6 +14,6 @@
           pkg="diffdope_ros"
           type="refine.py"
           output="screen"
-          args="$(arg config_file_name)"
+          args="$(arg config_file_name) $(arg object_name)"
     />
 </launch>

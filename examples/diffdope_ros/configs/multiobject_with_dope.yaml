@@ -7,32 +7,32 @@ camera:
     im_width: 1280
     im_height: 720
 segment_anything_checkpoint_path: ~/sam_vit_b_01ec64.pth
-image_resize: 0.5
+image_resize: 1.0
 topics:
     rgb: /camera/color/image_raw
-    depth: /camera/depth/image_rect_raw
+    depth: /camera/aligned_depth_to_color/image_raw
 objects:
     - name: bbq_sauce
-      scale: 0.001
+      scale: 0.1
       pose_topic: /dope/pose_BBQSauce
-      model_path: data/example/mesh/hope/bbq_sauce.obj
+      model_path: meshes/hope/bbq_sauce/bbq_sauce.obj
     - name: orange_juice
-      scale: 0.001
+      scale: 0.01
       pose_topic: /dope/pose_OrangeJuice
-      model_path: data/example/mesh/hope/orange_juice.obj
+      model_path: meshes/hope/orange_juice/orange_juice.obj
     - name: mustard
-      scale: 0.001
+      scale: 0.01
       pose_topic: /dope/pose_Mustard
-      model_path: data/example/mesh/hope/mustard.obj
+      model_path: meshes/hope/mustard/mustard.obj
 losses:
-    l1_rgb_with_mask: false
-    weight_rgb: 0.7
-    l1_depth_with_mask: false
-    weight_depth: 1
+    l1_rgb_with_mask: true
+    weight_rgb: 0.25
+    l1_depth_with_mask: true
+    weight_depth: 0.25
     l1_mask: true
-    weight_mask: 1
+    weight_mask: 0.5
 hyperparameters:
-    nb_iterations: 60
+    nb_iterations: 30
     batchsize: 8
     base_lr: 20
     learning_rates_bound: [0.01, 100]

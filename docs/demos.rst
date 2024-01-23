@@ -65,12 +65,12 @@ From there you can run the demo like so:
     rosrun diffdope_ros server.py # To start the actionlib server
 
     # Refine pose for individual object
-    rosrun diffdope_ros refine.py object_name:=bbq_sauce
-    rosrun diffdope_ros refine.py object_name:=orange_juice
-    rosrun diffdope_ros refine.py object_name:=mustard
+    roslaunch diffdope_ros refine.launch object_name:=bbq_sauce
+    roslaunch diffdope_ros refine.launch object_name:=orange_juice
+    roslaunch diffdope_ros refine.launch object_name:=mustard
 
     # or don't pass object_name to refine the pose of all the objects in the config
-    rosrun diffdope_ros refine.py
+    roslaunch diffdope_ros refine.launch
 
 The possible object names for this demo are: ``bbq_sauce, orange_juice, mustard``
 (as defined in the config file, ``diffdope_ros/config/multiobject_with_dope.yaml``).

@@ -27,9 +27,9 @@ pose estimation, and dictates topics for RGB and Depth (assuming a RealSense
 sensor).
 
 You can also download a ROS bag from `here (simple scene)
-<https://leeds365-my.sharepoint.com/personal/scsrp_leeds_ac_uk/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fscsrp%5Fleeds%5Fac%5Fuk%2FDocuments%2FResearch%2Fsimple%5Fhope%5Fscene%5Fwith%5Fdope%5Fdetections%2Ebag&parent=%2Fpersonal%2Fscsrp%5Fleeds%5Fac%5Fuk%2FDocuments%2FResearch&ga=1>`_
+<https://leeds365-my.sharepoint.com/:u:/g/personal/scsrp_leeds_ac_uk/EX5KdVQz6ntMtS_P-GBXxFoB4gPzPbSLvxItWlSsDGlbhA?e=hBQ6nh>`_
 or `here (cluttered scene)
-<https://leeds365-my.sharepoint.com/:u:/g/personal/scsrp_leeds_ac_uk/EUO5a2GfZRFOrueUzRbkLSwBZD3WoTsm5MP8hXeF0AYAEw?e=3YOqr6>`_
+<https://leeds365-my.sharepoint.com/:u:/g/personal/scsrp_leeds_ac_uk/EUO5a2GfZRFOrueUzRbkLSwBZD3WoTsm5MP8hXeF0AYAEw?e=1llEyq>`_
 to play with this demo, without the need of a real sensor.
 
 If you wish to use the ROS bag, you can play it back in a loop like so:

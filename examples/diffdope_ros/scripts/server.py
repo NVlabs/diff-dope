@@ -12,6 +12,7 @@ from collections import namedtuple
 import actionlib
 import cv2
 import hydra
+import numpy as np
 import rospy
 import tf.transformations as tf_trans
 import torch
@@ -25,6 +26,7 @@ from diffdope_ros.msg import (
 )
 from geometry_msgs.msg import PoseStamped
 from omegaconf import DictConfig, OmegaConf, open_dict
+from pyquaternion import Quaternion
 from segmentator import SegmentAnything
 from sensor_msgs.msg import CameraInfo
 
@@ -288,7 +290,7 @@ class DiffDOPEServer:
         position = [pos.x * 1_000, pos.y * 1_000, pos.z * 1_000]
 
         quat = goal.pose.pose.orientation
-        rotation = [quat.x, quat.y, quat.z, quat.w]  # respecting diffdope order
+        rotation = [quat.x, quat.y, quat.z, quat.w]
 
         model_path = os.path.join(diffdope_ros_path, goal.model_path)
         object3d = dd.Object3D(

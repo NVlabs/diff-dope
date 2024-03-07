@@ -49,6 +49,11 @@ and download the weights of the model.
 
     pip install git+https://github.com/facebookresearch/segment-anything.git
 
+You also need to install pyquaternion:
+
+.. code::
+
+    pip install pyquaternion
 
 Then head to the
 `model checkpoints section <https://github.com/facebookresearch/segment-anything?tab=readme-ov-file#model-checkpoints>`_,
@@ -62,7 +67,7 @@ From there you can run the demo like so:
 
 .. code::
 
-    rosrun diffdope_ros server.py # To start the actionlib server
+    roslaunch diffdope_ros server.py # To start the actionlib server
 
     # Refine pose for individual object
     roslaunch diffdope_ros refine.launch object_name:=bbq_sauce

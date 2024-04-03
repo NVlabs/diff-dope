@@ -1732,4 +1732,3 @@ class DiffDope:
         self.object3d.cuda()
         self.scene.cuda()
         self.camera.cuda()
-        pass

@@ -1,3 +1,5 @@
+#!/bin/python3
+import copy
 import os
 import re
 import sys
@@ -14,6 +16,9 @@ import cv2
 import hydra
 import numpy as np
 import rospy
+import tf2_geometry_msgs
+import tf2_ros
+import tf.transformations
 import tf.transformations as tf_trans
 import torch
 from cv_bridge import CvBridge
@@ -24,7 +29,7 @@ from diffdope_ros.msg import (
     RefineObjectResult,
     TargetObject,
 )
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Quaternion
 from omegaconf import DictConfig, OmegaConf, open_dict
 from pyquaternion import Quaternion
 from segmentator import SegmentAnything
@@ -286,10 +291,14 @@ class DiffDOPEServer:
         return scene
 
     def __generate_3d_object(self, goal: TargetObject):
-        pos = goal.pose.pose.position
-        position = [pos.x * 1_000, pos.y * 1_000, pos.z * 1_000]
+        dope_pose = goal.pose.pose
+        dope_position = dope_pose.position
+        position = np.array([dope_position.x, dope_position.y, dope_position.z])
 
-        quat = goal.pose.pose.orientation
+        # Convert to mm
+        position *= 1_000
+
+        quat = dope_pose.orientation
         rotation = [quat.x, quat.y, quat.z, quat.w]
 
         model_path = os.path.join(diffdope_ros_path, goal.model_path)

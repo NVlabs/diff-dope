@@ -9,7 +9,7 @@ topics:
     depth: /camera/aligned_depth_to_color/image_raw
 objects:
     - name: bbq_sauce
-      scale: 0.1
+      scale: 0.01
       pose_topic: /dope/pose_BBQSauce
       model_path: meshes/hope/bbq_sauce.ply
     - name: orange_juice
@@ -22,13 +22,13 @@ objects:
       model_path: meshes/hope/mustard.ply
 losses:
     l1_rgb_with_mask: true
-    weight_rgb: 0.25
+    weight_rgb: 0.7
     l1_depth_with_mask: true
-    weight_depth: 0.25
+    weight_depth: 1
     l1_mask: true
-    weight_mask: 0.5
+    weight_mask: 1
 hyperparameters:
-    nb_iterations: 50
+    nb_iterations: 60
     batchsize: 8
     base_lr: 20
     learning_rates_bound: [0.01, 100]

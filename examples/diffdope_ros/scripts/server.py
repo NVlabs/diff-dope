@@ -1,5 +1,4 @@
 #!/bin/python3
-import copy
 import os
 import re
 import sys
@@ -16,9 +15,6 @@ import cv2
 import hydra
 import numpy as np
 import rospy
-import tf2_geometry_msgs
-import tf2_ros
-import tf.transformations
 import tf.transformations as tf_trans
 import torch
 from cv_bridge import CvBridge
@@ -29,9 +25,8 @@ from diffdope_ros.msg import (
     RefineObjectResult,
     TargetObject,
 )
-from geometry_msgs.msg import PoseStamped, Quaternion
+from geometry_msgs.msg import PoseStamped
 from omegaconf import DictConfig, OmegaConf, open_dict
-from pyquaternion import Quaternion
 from segmentator import SegmentAnything
 from sensor_msgs.msg import CameraInfo
 

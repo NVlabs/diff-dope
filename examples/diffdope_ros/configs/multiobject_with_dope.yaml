@@ -12,10 +12,6 @@ objects:
       scale: 0.01
       pose_topic: /dope/pose_BBQSauce
       model_path: meshes/hope/bbq_sauce.ply
-    - name: orange_juice
-      scale: 0.01
-      pose_topic: /dope/pose_OrangeJuice
-      model_path: meshes/hope/orange_juice.ply
     - name: alphabet_soup
       scale: 0.01
       pose_topic: /dope/pose_AlphabetSoup

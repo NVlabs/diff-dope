@@ -145,6 +145,7 @@ class DiffDOPEServer:
         return target_object
 
     def __save_video(self, ddope):
+        rospy.loginfo("***You can disable video outputting from the config file***")
         video_dir = os.path.expanduser(self.cfg.saved_videos_path)
         self.__create_dir_if_not_exists(video_dir)
         next_video_id = self.__find_next_available_video_id(video_dir)
@@ -152,7 +153,25 @@ class DiffDOPEServer:
         ddope.make_animation(output_file_path=video_path)
         rospy.loginfo(f"Video saved at {video_path}")
 
+    def __convert_opengl_pose_to_opencv(self, transform):
+        transform[0, 3] /= 10
+        transform[1, 3] /= 10
+        transform[2, 3] /= 10
+
+        theta = np.pi
+        rotation_matrix = np.array(
+            [
+                [1, 0, 0, 0],
+                [0, np.cos(theta), -np.sin(theta), 0],
+                [0, np.sin(theta), np.cos(theta), 0],
+                [0, 0, 0, 1],
+            ]
+        )
+
+        return np.dot(rotation_matrix, transform)
+
     def __create_pose_stamped(self, diffdope_transform):
+        diffdope_transform = self.__convert_opengl_pose_to_opencv(diffdope_transform)
         translation = diffdope_transform[0:3, 3]
         quaternion = tf_trans.quaternion_from_matrix(diffdope_transform)
 
@@ -225,15 +244,9 @@ class DiffDOPEServer:
         return rgb_image
 
     def __convert_depth_frame_to_diffdope_image(self, cv_bridge, depth_frame):
-        depth_scale = 100
-        try:
-            depth_frame = (
-                cv_bridge.imgmsg_to_cv2(depth_frame, "passthrough") / depth_scale
-            )
-            depth_frame = cv2.flip(depth_frame, 0)  # needed by diff-dope
-        except Exception as e:
-            rospy.logerr(f"CvBridge Error: {e}")
-
+        depth_frame = cv_bridge.imgmsg_to_cv2(depth_frame, depth_frame.encoding)
+        depth_frame = depth_frame.astype(np.int16)
+        depth_frame = cv2.flip(depth_frame, 0)  # needed by diff-dope
         depth_frame = self.__resize_image(depth_frame, is_depth=True)
         depth_tensor = torch.tensor(depth_frame).float()
         depth_image = dd.Image(

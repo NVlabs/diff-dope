@@ -9,6 +9,7 @@ import cv2
 import hydra
 import rospkg
 import rospy
+from cv_bridge import CvBridge
 from diffdope_ros.msg import (
     RefineAllAction,
     RefineAllGoal,
@@ -157,6 +158,7 @@ def is_object_name_in_cfg(cfg, object_name):
 
 
 if __name__ == "__main__":
+    bridge = CvBridge()
     subscribers = []
     pose_lock = threading.Lock()
     live_dope_pose_per_object = {}

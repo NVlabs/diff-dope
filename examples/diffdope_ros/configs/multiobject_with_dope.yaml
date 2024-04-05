@@ -16,15 +16,19 @@ objects:
       scale: 0.01
       pose_topic: /dope/pose_OrangeJuice
       model_path: meshes/hope/orange_juice.ply
+    - name: alphabet_soup
+      scale: 0.01
+      pose_topic: /dope/pose_AlphabetSoup
+      model_path: meshes/hope/alphabet_soup.ply
     - name: mustard
       scale: 0.01
       pose_topic: /dope/pose_Mustard
       model_path: meshes/hope/mustard.ply
 losses:
-    l1_rgb_with_mask: true
-    weight_rgb: 0.7
-    l1_depth_with_mask: true
-    weight_depth: 1
+    l1_rgb_with_mask: false
+    weight_rgb: 0.2
+    l1_depth_with_mask: false
+    weight_depth: 0.2
     l1_mask: true
     weight_mask: 1
 hyperparameters:
@@ -42,4 +46,4 @@ render_images:
     add_countour: true
     color_countour: [0.46, 0.73, 0]
     flip_result: true
-    crop_around_mask: true
+    crop_around_mask: false

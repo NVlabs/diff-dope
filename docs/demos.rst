@@ -24,21 +24,17 @@ You can, of course, move the package there instead of creating a symlink.
 The demo uses a configuration under
 ``diffdope_ros/config/multiobject_with_dope.yaml`` which uses DOPE for initial
 pose estimation, and dictates topics for RGB and Depth (assuming a RealSense
-sensor).
+sensor). It also uses a camera info topic to retrieve camera intrinsic
+parameters as well as the image dimensions.
 
-You can also download a ROS bag from `here (simple scene)
-<https://leeds365-my.sharepoint.com/:u:/g/personal/scsrp_leeds_ac_uk/EX5KdVQz6ntMtS_P-GBXxFoB4gPzPbSLvxItWlSsDGlbhA?e=hBQ6nh>`_
-or `here (cluttered scene)
-<https://leeds365-my.sharepoint.com/:u:/g/personal/scsrp_leeds_ac_uk/EUO5a2GfZRFOrueUzRbkLSwBZD3WoTsm5MP8hXeF0AYAEw?e=1llEyq>`_
+You can also download a ROS bag from `here <https://leeds365-my.sharepoint.com/:u:/g/personal/scsrp_leeds_ac_uk/Ec-TbyOr1QVIt6NQQP7E4pABkEUmaEGByVjLHugY7Als_A?e=JES96n>`_
 to play with this demo, without the need of a real sensor.
 
 If you wish to use the ROS bag, you can play it back in a loop like so:
 
 .. code::
 
-    rosbag play -l ~/path/to/simple_hope_scene_with_dope_detections.bag
-    # or
-    rosbag play -l ~/path/to/cluttered_hope_scene_with_dope_detections.bag
+    rosbag play -l ~/path/to/simple.bag
 
 
 You need to install
@@ -48,12 +44,6 @@ and download the weights of the model.
 .. code::
 
     pip install git+https://github.com/facebookresearch/segment-anything.git
-
-You also need to install pyquaternion:
-
-.. code::
-
-    pip install pyquaternion
 
 Then head to the
 `model checkpoints section <https://github.com/facebookresearch/segment-anything?tab=readme-ov-file#model-checkpoints>`_,
@@ -71,11 +61,39 @@ From there you can run the demo like so:
 
     # Refine pose for individual object
     roslaunch diffdope_ros refine.launch object_name:=bbq_sauce
-    roslaunch diffdope_ros refine.launch object_name:=orange_juice
+    roslaunch diffdope_ros refine.launch object_name:=alphabet_soup
     roslaunch diffdope_ros refine.launch object_name:=mustard
 
     # or don't pass object_name to refine the pose of all the objects in the config
     roslaunch diffdope_ros refine.launch
 
-The possible object names for this demo are: ``bbq_sauce, orange_juice, mustard``
-(as defined in the config file, ``diffdope_ros/config/multiobject_with_dope.yaml``).
+The above names are derived from the config file, ``config/multiobject_with_dope.yaml``.
+The launch files pass this file to the server and refine scripts.
+
+Parameters
+************************
+
+Please inspect the ``config/multiobject_with_dope.yaml`` file to see certain 
+parameters. For example, by default this demo will produce videos of the 
+optimisation, however you can turn this off through the config file
+to speed things up. You can also adjust certain optimisation parameters from
+the config file.
+
+Dealing with DOPE and model coordinate frames
+************************
+
+Please note the following important details when you try to use a new object
+and pose from DOPE:
+
+* DOPE pose output may not match the coordinate frame used in the 3D model of
+  the object you wish to use. In this case, you need to apply a static
+  transformation to bring the DOPE pose output to match the one used in your 3D
+  model. DOPE provides a way in the config file (``model_transforms``) to define such transformation
+  per object. For more details on this subject, please read `this <https://github.com/NVlabs/Deep_Object_Pose/issues/346>`_.
+* The scaling of the object is important. We suggest that you scale your 3D object
+  in Blender to bring it closer to the scale of the examples. For example,
+  the HOPE objects as downloaded from the official repository, we had to scale them
+  by a factor of 10. Although a parameter to scale the 3D object in the config
+  is available, we had difficulties to get it to work properly and found better
+  luck by manually scaling the 3D object in Blender. You can import a reference
+  object (like the BBQ Sauce model we provide) in Blender to see the scale.

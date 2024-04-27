@@ -24,6 +24,12 @@ The first run will compile several CUDA kernels, which will take a brief amount 
 ## Run on BOP
 You can check `examples/run_bop_scene.py` to see how to load poses from a dataset and run optization. This uses the pertubed poses from the diff-dope paper. The paths in the file are absolute so you are going to need to change them.
 
+## Run a ROS example
+
+You can check a ROS example using an integrated system with SegmentAnything and
+DOPE (for initial estimate) and Diff-DOPE as a pose refiner. More details about
+this example [here](docs/demos.rst).
+
 ## Features and TODO
 - Add a point cloud visualizer to check the output pose, use open 3d
 - Add an example that uses a 3rd party neural network to add as a loss, canny detection, latent space

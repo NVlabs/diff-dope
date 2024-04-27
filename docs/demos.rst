@@ -7,7 +7,7 @@ Multi-object using ROS and DOPE with RGB and Depth
 The demo uses RGB and Depth from a RealSense camera, poses published by DOPE,
 and segments the image using
 `segment-anything <https://github.com/facebookresearch/segment-anything>`_.
-The demo comes as a catkin package under ``examples/``.
+The demo comes as a catkin package under ``diffdope_ros/``.
 
 Say you cloned the diff-dope repo under your home directory (i.e., ``~/diff-dope``),
 and you have a catkin workspace under your home directory too (i.e., ``~/catkin_ws``),
@@ -16,7 +16,7 @@ you can create a symlink of the package there:
 .. code::
 
     cd ~/catkin_ws/src
-    ln -s ~/diff-dope/examples/diffdope_ros .
+    ln -s ~/diff-dope/diffdope_ros .
 
 You can ``catkin_make`` under ``~/catkin_ws`` now to build the package.
 You can, of course, move the package there instead of creating a symlink.

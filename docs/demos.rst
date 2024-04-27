@@ -37,9 +37,17 @@ If you wish to use the ROS bag, you can play it back in a loop like so:
     rosbag play -l ~/path/to/simple.bag
 
 
+Install diffdope, under the root diffdope directory:
+
+.. code::
+
+    pip install -r requirements.txt
+    pip install -e .
+
+
 You need to install
 `segment-anything <https://github.com/facebookresearch/segment-anything>`_
-and download the weights of the model.
+and download the checkpoints.
 
 .. code::
 
@@ -53,7 +61,15 @@ to let it know where to find it. If you want to test the segmentation
 functionality independently, you can run the following Python script:
 ``diffdope_ros/scripts/segmentator.py``.
 
-From there you can run the demo like so:
+Now run DOPE using:
+
+.. code::
+
+   roslaunch dope dope.launch
+
+
+Make sure DOPE detects the objects and that the topics you expect are being
+published. From there you can run the demo like so:
 
 .. code::
 
@@ -71,7 +87,7 @@ The above names are derived from the config file, ``config/multiobject_with_dope
 The launch files pass this file to the server and refine scripts.
 
 Parameters
-************************
+--------------------------------------------------
 
 Please inspect the ``config/multiobject_with_dope.yaml`` file to see certain 
 parameters. For example, by default this demo will produce videos of the 
@@ -80,7 +96,7 @@ to speed things up. You can also adjust certain optimisation parameters from
 the config file.
 
 Dealing with DOPE and model coordinate frames
-************************
+--------------------------------------------------
 
 Please note the following important details when you try to use a new object
 and pose from DOPE:

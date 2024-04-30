@@ -1,7 +1,7 @@
 ---
 segment_anything_checkpoint_path: ~/sam_vit_b_01ec64.pth
 image_resize: 0.5
-save_video: true
+save_video: false
 max_saved_videos_per_run: 5
 saved_videos_path: ~/output_videos
 topics:
@@ -29,7 +29,7 @@ losses:
     l1_mask: true
     weight_mask: 1
 hyperparameters:
-    nb_iterations: 60
+    nb_iterations: 30
     batchsize: 8
     base_lr: 20
     learning_rates_bound: [0.01, 100]

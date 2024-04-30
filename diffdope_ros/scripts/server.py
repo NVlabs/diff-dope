@@ -130,7 +130,13 @@ class DiffDOPEServer:
         ddope = dd.DiffDope(cfg=self.cfg, scene=scene, object3d=object3d)
         ddope.run_optimization()
 
-        if self.cfg.save_video:
+        if (
+            self.cfg.save_video
+            and self.num_of_saved_videos_in_this_run < self.cfg.max_saved_videos_per_run
+        ):
+            self.__save_video(ddope)
+            self.num_of_saved_videos_in_this_run += 1
+
             if (
                 self.num_of_saved_videos_in_this_run
                 == self.cfg.max_saved_videos_per_run
@@ -144,16 +150,13 @@ class DiffDOPEServer:
                 rospy.loginfo(
                     "If you prefer, disable saving of video from the config file altogether."
                 )
-            else:
-                self.__save_video(ddope)
-                self.num_of_saved_videos_in_this_run += 1
 
         refined_pose = self.__create_pose_stamped(ddope.get_pose())
-        target_object = TargetObject()
-        target_object.name = target_object.name
-        target_object.pose = refined_pose
+        refined_target_object = TargetObject()
+        refined_target_object.name = target_object.name
+        refined_target_object.pose = refined_pose
 
-        return target_object
+        return refined_target_object
 
     def __save_video(self, ddope):
         rospy.loginfo("***You can disable video outputting from the config file***")

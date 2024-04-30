@@ -167,6 +167,7 @@ generate_messages(
 catkin_install_python(PROGRAMS
   scripts/server.py
   scripts/refine.py
+  scripts/refine_continuous.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

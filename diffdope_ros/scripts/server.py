@@ -18,6 +18,12 @@ import rospy
 import tf.transformations as tf_trans
 import torch
 from cv_bridge import CvBridge
+from geometry_msgs.msg import PoseStamped
+from omegaconf import DictConfig, OmegaConf, open_dict
+from segmentator import SegmentAnything
+from sensor_msgs.msg import CameraInfo
+
+import diffdope as dd
 from diffdope_ros.msg import (
     RefineAllAction,
     RefineAllResult,
@@ -25,17 +31,12 @@ from diffdope_ros.msg import (
     RefineObjectResult,
     TargetObject,
 )
-from geometry_msgs.msg import PoseStamped
-from omegaconf import DictConfig, OmegaConf, open_dict
-from segmentator import SegmentAnything
-from sensor_msgs.msg import CameraInfo
-
-import diffdope as dd
 
 
 class DiffDOPEServer:
     def __init__(self, cfg: DictConfig):
         self.cfg = cfg
+        self.num_of_saved_videos_in_this_run = 0
         self.camera_parameters = self.__get_camera_intrinsic_params(
             self.cfg.topics.camera_info
         )
@@ -130,7 +131,22 @@ class DiffDOPEServer:
         ddope.run_optimization()
 
         if self.cfg.save_video:
-            self.__save_video(ddope)
+            if (
+                self.num_of_saved_videos_in_this_run
+                == self.cfg.max_saved_videos_per_run
+            ):
+                rospy.loginfo(
+                    f"No new videos will be saved in this run. This is because your config file dictates max of {self.cfg.max_saved_videos_per_run} saved videos per run."
+                )
+                rospy.loginfo(
+                    'This is a mechanism to avoid saving too many videos during "continuous tracking" (refine_continuous.launch).'
+                )
+                rospy.loginfo(
+                    "If you prefer, disable saving of video from the config file altogether."
+                )
+            else:
+                self.__save_video(ddope)
+                self.num_of_saved_videos_in_this_run += 1
 
         refined_pose = self.__create_pose_stamped(ddope.get_pose())
         target_object = TargetObject()

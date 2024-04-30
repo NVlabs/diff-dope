@@ -2,6 +2,7 @@
 segment_anything_checkpoint_path: ~/sam_vit_b_01ec64.pth
 image_resize: 0.5
 save_video: true
+max_saved_videos_per_run: 5
 saved_videos_path: ~/output_videos
 topics:
     camera_info: /camera/color/camera_info

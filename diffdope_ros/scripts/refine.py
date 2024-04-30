@@ -10,6 +10,10 @@ import hydra
 import rospkg
 import rospy
 from cv_bridge import CvBridge
+from geometry_msgs.msg import PoseStamped
+from omegaconf import DictConfig
+from sensor_msgs.msg import Image as ROS_Image
+
 from diffdope_ros.msg import (
     RefineAllAction,
     RefineAllGoal,
@@ -17,9 +21,6 @@ from diffdope_ros.msg import (
     RefineObjectGoal,
     TargetObject,
 )
-from geometry_msgs.msg import PoseStamped
-from omegaconf import DictConfig
-from sensor_msgs.msg import Image as ROS_Image
 
 
 def pose_callback(pose_stamped_msg, object_name):
@@ -27,18 +28,28 @@ def pose_callback(pose_stamped_msg, object_name):
         live_dope_pose_per_object[object_name] = pose_stamped_msg
 
 
-def rgb_callback(img_msg, object_name):
+def rgb_callback(img_msg):
     with rgb_lock:
-        live_rgb_per_object[object_name] = img_msg
+        live_rgb = img_msg
 
 
-def depth_callback(depth_msg, object_name):
+def depth_callback(depth_msg):
     with depth_lock:
-        live_depth_per_object[object_name] = depth_msg
+        live_depth = depth_msg
 
 
 def init_ros_subscribers(cfg):
     rospy.init_node("diffdope", anonymous=True)
+
+    # Create RGB frame subscriber
+    rgb_topic = cfg.topics.rgb
+    rgb_sub = rospy.Subscriber(rgb_topic, ROS_Image, rgb_callback)
+    subscribers.append(rgb_sub)
+
+    # Create depth frame subscriber
+    depth_topic = cfg.topics.depth
+    depth_sub = rospy.Subscriber(depth_topic, ROS_Image, depth_callback)
+    subscribers.append(depth_sub)
 
     for obj in cfg["objects"]:
         object_name = obj["name"]
@@ -51,22 +62,6 @@ def init_ros_subscribers(cfg):
         )
         subscribers.append(pose_sub)
 
-        # Create RGB frame subscriber
-        live_rgb_per_object[object_name] = None
-        rgb_topic = cfg.topics.rgb
-        rgb_sub = rospy.Subscriber(
-            rgb_topic, ROS_Image, partial(rgb_callback, object_name=object_name)
-        )
-        subscribers.append(rgb_sub)
-
-        # Create depth frame subscriber
-        live_depth_per_object[object_name] = None
-        depth_topic = cfg.topics.depth
-        depth_sub = rospy.Subscriber(
-            depth_topic, ROS_Image, partial(depth_callback, object_name=object_name)
-        )
-        subscribers.append(depth_sub)
-
     # Allow time for subscribers to initialise first pose/frames.
     time.sleep(1)
 
@@ -78,8 +73,8 @@ def get_initialisation_for(object_name):
     while dope_pose is None or rgb_frame is None or depth_frame is None:
         with pose_lock, rgb_lock, depth_lock:
             dope_pose = live_dope_pose_per_object[object_name]
-            rgb_frame = live_rgb_per_object[object_name]
-            depth_frame = live_depth_per_object[object_name]
+            rgb_frame = live_rgb
+            depth_frame = live_depth
 
     return dope_pose, rgb_frame, depth_frame
 
@@ -164,10 +159,10 @@ if __name__ == "__main__":
     live_dope_pose_per_object = {}
 
     rgb_lock = threading.Lock()
-    live_rgb_per_object = {}
+    live_rgb = None
 
     depth_lock = threading.Lock()
-    live_depth_per_object = {}
+    live_depth = None
 
     cfg = parse_cfg()
     init_ros_subscribers(cfg)

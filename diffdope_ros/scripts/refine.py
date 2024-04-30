@@ -24,16 +24,19 @@ from diffdope_ros.msg import (
 
 
 def pose_callback(pose_stamped_msg, object_name):
+    global live_dope_pose_per_object
     with pose_lock:
         live_dope_pose_per_object[object_name] = pose_stamped_msg
 
 
 def rgb_callback(img_msg):
+    global live_rgb
     with rgb_lock:
         live_rgb = img_msg
 
 
 def depth_callback(depth_msg):
+    global live_depth
     with depth_lock:
         live_depth = depth_msg
 
@@ -83,6 +86,26 @@ def get_object_definition_by_name(cfg, object_name):
     for obj_cfg in cfg.objects:
         if obj_cfg.name == object_name:
             return obj_cfg
+
+
+def wait_until_all_data_available():
+    rospy.loginfo("Waiting for all data to become available ...")
+
+    while True:
+        if live_rgb is None:
+            rospy.loginfo("Waiting for rgb frames ...")
+        elif live_depth is None:
+            rospy.loginfo("Waiting for depth frames ...")
+        elif any([v is None for _, v in live_dope_pose_per_object.items()]):
+            rospy.loginfo("Waiting for some initial poses ...")
+            for k, v in live_dope_pose_per_object.items():
+                if v is None:
+                    rospy.loginfo(f"The pose of object {k} isn't available yet ...")
+        else:
+            break
+        time.sleep(0.5)
+
+    rospy.loginfo("All data available. Starting refinement.")
 
 
 def main_single_object(cfg: DictConfig, object_name):
@@ -166,6 +189,7 @@ if __name__ == "__main__":
 
     cfg = parse_cfg()
     init_ros_subscribers(cfg)
+    wait_until_all_data_available()
 
     object_name = sys.argv[2]
     if object_name == "all":

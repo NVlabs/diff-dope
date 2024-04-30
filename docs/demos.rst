@@ -69,7 +69,7 @@ Now run DOPE using:
 
 
 Make sure DOPE detects the objects and that the topics you expect are being
-published. From there you can run the demo like so:
+published. From there you can run the ``refine.launch`` demo like so:
 
 .. code::
 
@@ -86,14 +86,41 @@ published. From there you can run the demo like so:
 The above names are derived from the config file, ``config/multiobject_with_dope.yaml``.
 The launch files pass this file to the server and refine scripts.
 
+The ``refine.launch`` is just doing a single refinement and exit. There is
+also the ``refine_continuous.launch`` that will do continuous refinement
+and publish the refined pose to a topic ``/diffdope_object_name``.
+
+.. code::
+
+    roslaunch diffdope_ros server.py # To start the actionlib server
+
+    # Refine pose for individual object
+    roslaunch diffdope_ros refine_continuous.launch object_name:=bbq_sauce
+    roslaunch diffdope_ros refine_continuous.launch object_name:=alphabet_soup
+    roslaunch diffdope_ros refine_continuous.launch object_name:=mustard
+
+    # or don't pass object_name to refine the pose of all the objects in the config
+    roslaunch diffdope_ros refine_continuous.launch
+
+
 Parameters
 --------------------------------------------------
 
-Please inspect the ``config/multiobject_with_dope.yaml`` file to see certain 
-parameters. For example, by default this demo will produce videos of the 
+Please inspect the ``config/multiobject_with_dope.yaml`` file to see certain
+parameters. For example, by default this demo will produce videos of the
 optimisation, however you can turn this off through the config file
 to speed things up. You can also adjust certain optimisation parameters from
-the config file.
+the config file. Some parameters related to the ROS demo below:
+
++-----------------+-----------------+
+| Parameter | Explanation        |
++=================+=================+
+| segment_anything_checkpoint_path | path to the checkpoint file for segment anything. |
++-----------------+-----------------+
+| save_video | whether to save a video visualizing the diffdope optimization. |
++-----------------+-----------------+
+| max_saved_videos_per_run | This will dictate how many videos will be generated per run, to avoid generating too many when running the continuous version. |
++-----------------+-----------------+
 
 Dealing with DOPE and model coordinate frames
 --------------------------------------------------

@@ -1,4 +1,5 @@
 from setuptools import find_packages, setup
+from torch.utils.cpp_extension import BuildExtension, CUDAExtension
 
 setup(
     name="diffdope",
@@ -26,4 +27,23 @@ setup(
             "pre-commit",
         ],
     },
+    ext_modules=[
+        CUDAExtension(
+            name="renderutils_plugin",
+            sources=[
+                "src/diffdope/c_src/mesh.cu", 
+                "src/diffdope/c_src/common.cpp", 
+                "src/diffdope/c_src/torch_bindings.cpp"
+            ],
+            include_dirs=["src/diffdope/c_src/"],
+            extra_compile_args={
+                "cxx": ["-O3", "-DNVDR_TORCH"],
+                "nvcc": ["-O3"]
+            },
+            extra_link_args=["-lcuda", "-lnvrtc"]
+        )
+    ],
+    cmdclass={
+        "build_ext": BuildExtension
+    }
 )

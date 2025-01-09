@@ -224,12 +224,6 @@ def render_texture_batch(
             texd,
             filter_mode="linear",
         )
-        color = dr.texture(
-            tex,
-            texc,
-            texd,
-            filter_mode="linear",
-        )
 
         color = color * torch.clamp(rast_out[..., -1:], 0, 1)  # Mask out background.
     else:

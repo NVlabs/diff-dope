@@ -6,10 +6,10 @@ matplotlib.use("Agg")
 
 import collections
 import io
-import sys
 import math
 import pathlib
 import random
+import sys
 import warnings
 from dataclasses import dataclass
 from itertools import repeat
@@ -36,7 +36,7 @@ import diffdope as dd
 
 # for better print debug
 print()
-if not hasattr(sys, 'ps1'):
+if not hasattr(sys, "ps1"):
     print = ic
 
 # A logger for this file
@@ -209,9 +209,14 @@ def render_texture_batch(
     depth = depth.reshape(shape_keep)[..., 2] * -1
 
     # mask   , _ = dr.interpolate(torch.ones(pos_idx.shape).cuda(), rast_out, pos_idx)
-    mask, _ = dr.interpolate(torch.ones(pos_idx.shape).cuda(), 
-        rast_out, pos_idx[0],rast_db=rast_out_db,diff_attrs="all")
-    mask       = dr.antialias(mask, rast_out, pos_clip_ja, pos_idx[0])
+    mask, _ = dr.interpolate(
+        torch.ones(pos_idx.shape).cuda(),
+        rast_out,
+        pos_idx[0],
+        rast_db=rast_out_db,
+        diff_attrs="all",
+    )
+    mask = dr.antialias(mask, rast_out, pos_clip_ja, pos_idx[0])
 
     # compute vertex color interpolation
     if vtx_color is None:
@@ -231,7 +236,7 @@ def render_texture_batch(
         color = color * torch.clamp(rast_out[..., -1:], 0, 1)  # Mask out background.
     if not return_rast_out:
         rast_out = None
-    return {"rgb": color, "depth": depth, "rast_out": rast_out, 'mask':mask}
+    return {"rgb": color, "depth": depth, "rast_out": rast_out, "mask": mask}
 
 
 ##############################################################################
@@ -967,7 +972,7 @@ class Object3D(torch.nn.Module):
         self.qx = None  # to load on cpu and not gpu
 
         if model_path is None:
-            self.mesh = None    
+            self.mesh = None
         else:
             self.mesh = Mesh(path_model=model_path, scale=scale)
 
@@ -1221,11 +1226,11 @@ class Scene:
         Args:
             batchsize (int): batchsize for the tensors
         """
-        if not self.path_img is None:
+        if not self.tensor_rgb is None:
             self.tensor_rgb.set_batchsize(batchsize)
-        if not self.path_depth is None:
+        if not self.tensor_depth is None:
             self.tensor_depth.set_batchsize(batchsize)
-        if not self.path_segmentation is None:
+        if not self.tensor_segmentation is None:
             self.tensor_segmentation.set_batchsize(batchsize)
 
     def get_resolution(self):
@@ -1235,17 +1240,17 @@ class Scene:
         Return
             (list): w,h of the image for optimization
         """
-        if not self.path_img is None:
+        if not self.tensor_rgb is None:
             return [
                 self.tensor_rgb.img_tensor.shape[-3],
                 self.tensor_rgb.img_tensor.shape[-2],
             ]
-        if not self.path_depth is None:
+        if not self.tensor_depth is None:
             return [
                 self.tensor_depth.img_tensor.shape[-2],
                 self.tensor_depth.img_tensor.shape[-1],
             ]
-        if not self.path_segmentation is None:
+        if not self.tensor_segmentation is None:
             return [
                 self.tensor_segmentation.img_tensor.shape[-3],
                 self.tensor_segmentation.img_tensor.shape[-2],
@@ -1256,11 +1261,11 @@ class Scene:
         Put on cuda the image tensors
         """
 
-        if not self.path_img is None:
+        if not self.tensor_rgb is None:
             self.tensor_rgb.cuda()
-        if not self.path_depth is None:
+        if not self.tensor_depth is None:
             self.tensor_depth.cuda()
-        if not self.path_segmentation is None:
+        if not self.tensor_segmentation is None:
             self.tensor_segmentation.cuda()
 
 
@@ -1418,7 +1423,7 @@ class DiffDope:
 
             else:
                 crop = find_crop(self.optimization_results[index][render_selection][0])
-        
+
         if batch_index is None:
             # make a grid
             if self.cfg.render_images.crop_around_mask:
@@ -1650,7 +1655,6 @@ class DiffDope:
         if self.scene.tensor_segmentation is not None:
             self.gt_tensors["segmentation"] = self.scene.tensor_segmentation.img_tensor
 
-
         pbar = tqdm(range(self.cfg.hyperparameters.nb_iterations + 1))
 
         for iteration_now in pbar:
@@ -1722,4 +1726,3 @@ class DiffDope:
         self.object3d.cuda()
         self.scene.cuda()
         self.camera.cuda()
-        pass

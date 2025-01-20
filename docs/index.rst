@@ -11,6 +11,7 @@ Welcome to Diff-DOPE's documentation!
    :caption: Contents:
 
    modules
+   demos
 
 Indices and tables
 ==================

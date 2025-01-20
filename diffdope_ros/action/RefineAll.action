@@ -1,0 +1,8 @@
+# Request
+diffdope_ros/TargetObject[] target_objects
+---
+# Result
+diffdope_ros/TargetObject[] refined_estimations
+---
+# Feedback
+bool finished
